@@ -1,4 +1,6 @@
 add_executable (LoopyMSE
+    "autodrive.h"
+    "autodrive.cpp"
     "config.h"
     "options.h"
     "options.cpp"

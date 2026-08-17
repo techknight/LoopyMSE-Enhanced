@@ -14,6 +14,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "autodrive.h"
 #include "config.h"
 #include "options.h"
 
@@ -441,7 +442,8 @@ int main(int argc, char** argv)
 	Log::set_level(args.verbose ? Log::VERBOSE : Log::INFO);
 
 	// Plug in the emulated mouse at startup if configured; F2/F1 switch between mouse and gamepad at runtime
-	Input::set_mouse_plugged(args.mouse);
+	Input::set_mouse_plugged(args.mouse || args.autodrive);
+	Autodrive::set_enabled(args.autodrive);
 
 	bool result = false;
 	for (const auto& path : search_paths(args.bios, args.cart))
@@ -533,6 +535,7 @@ int main(int argc, char** argv)
 			while (draw_frames > 0)
 			{
 				System::run();
+				Autodrive::run_frame();
 				draw_frames--;
 			}
 			SDL::update(System::get_display_output(), Video::get_display_scanlines(), Video::get_background_color());
@@ -602,6 +605,7 @@ int main(int argc, char** argv)
 					if (config.cart.is_loaded())
 					{
 						Log::info("Rebooting Loopy...");
+						Autodrive::reset();
 						System::shutdown(config);
 						System::initialize(config);
 						last_frame_ticks = INT_MAX;

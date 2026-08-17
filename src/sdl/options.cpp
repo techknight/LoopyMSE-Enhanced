@@ -59,6 +59,7 @@ void parse_commandline(int argc, char** argv, Args& args)
 		("bios", po::value<std::string>(), "Path to Loopy BIOS file")
 		("sound_bios", po::value<std::string>(), "Path to Loopy sound BIOS file")
 		("verbose,v", "Enable verbose logging output")
+		("autodrive", "Let a cooperating cartridge drive the emulated mouse (implies plugging the mouse in)")
 		("cart", po::value<std::string>(), "Cartridge to load (--cart can be omitted, use path to ROM as first positional argument)" );
 
 	po::variables_map vm;
@@ -87,6 +88,7 @@ void parse_commandline(int argc, char** argv, Args& args)
 	if (vm.count("bios")) args.bios = vm["bios"].as<std::string>();
 	if (vm.count("sound_bios")) args.sound_bios = vm["sound_bios"].as<std::string>();
 	if (vm.count("cart")) args.cart = vm["cart"].as<std::string>();
+	if (vm.count("autodrive")) args.autodrive = true;
 	args.verbose = vm.count("verbose");
 }
 
@@ -152,6 +154,7 @@ bool parse_config(fs::path config_path, Args& args)
 		("emulator.crop_overscan", po::value<bool>()->default_value(true), "Crop border and overscan areas")
 		("emulator.antialias", po::value<bool>()->default_value(true), "Apply AA (recommended when used with aspect ratio correction)")
 		("emulator.mouse", po::value<bool>()->default_value(false), "Plug in the emulated Loopy mouse at startup (at runtime, F2 plugs in the mouse and F1 the gamepad)")
+		("emulator.autodrive", po::value<bool>()->default_value(false), "Let a cooperating cartridge drive the emulated mouse (implies plugging the mouse in)")
 		("emulator.screenshot_image_type", po::value<std::string>()->default_value("png"), "Image file type for screenshots");
 
 	po::options_description printer_options("Printer");
@@ -182,6 +185,7 @@ bool parse_config(fs::path config_path, Args& args)
 		args.antialias = vm["emulator.antialias"].as<bool>();
 		args.crop_overscan = vm["emulator.crop_overscan"].as<bool>();
 		args.mouse = vm["emulator.mouse"].as<bool>();
+		args.autodrive = vm["emulator.autodrive"].as<bool>();
 		args.int_scale = vm["emulator.int_scale"].as<int>();
 
 		args.screenshot_image_type = imagew::parse_image_type(
