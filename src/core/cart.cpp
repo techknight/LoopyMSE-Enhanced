@@ -14,9 +14,11 @@ struct State
 };
 
 static State state;
+static bool sram_write_enabled = true;
 
 static void commit_sram()
 {
+	if (!sram_write_enabled) return;
 	std::ofstream file(state.sram_file_path, std::ios::binary);
 	file.write((char*)state.sram.data(), state.sram.size());
 }
@@ -66,6 +68,11 @@ void sram_commit_check()
 
 	frame_count = 0;
 	commit_sram();
+}
+
+void set_sram_write_enabled(bool enabled)
+{
+	sram_write_enabled = enabled;
 }
 
 }

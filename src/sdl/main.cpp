@@ -1,5 +1,6 @@
 #include <SDL.h>
 #include <common/bswp.h>
+#include <core/cart.h>
 #include <core/config.h>
 #include <core/system.h>
 #include <input/input.h>
@@ -8,11 +9,16 @@
 #include <sound/sound.h>
 #include <video/video.h>
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <set>
+#include <sstream>
+#include <vector>
 
 #include "autodrive.h"
 #include "config.h"
@@ -240,8 +246,8 @@ void initialize(Options::Args& args)
 	//Allow use of our own main()
 	SDL_SetMainReady();
 
-	//Try synchronizing window drawing to VBLANK
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+	//Try synchronizing window drawing to VBLANK (not when running as fast as possible for automation)
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, args.headless_fast ? "0" : "1");
 	SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "1");
 	//Workaround for bug in SDL2 2.32 where window doesn't activate, not needed in 2.30
 	SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "0");
@@ -271,7 +277,9 @@ void initialize(Options::Args& args)
 	window_size = resize_window(false, 1);
 	SDL_SetWindowMinimumSize(screen.window, window_size.x, window_size.y);
 
-	screen.renderer = SDL_CreateRenderer(screen.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	screen.renderer = SDL_CreateRenderer(
+		screen.window, -1, SDL_RENDERER_ACCELERATED | (args.headless_fast ? 0 : SDL_RENDERER_PRESENTVSYNC)
+	);
 
 	screen.framebuffer = SDL_CreateTexture(
 		screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT
@@ -416,6 +424,105 @@ std::vector<fs::path> search_paths(fs::path file_path, fs::path cart_path)
 	return vec;
 }
 
+// ---- Dev automation (local development build only) ----
+//
+// Input script (--input-script FILE) format:
+//   One entry per line:  FRAME BUTTONS
+//     FRAME    decimal emulated frame number (frame 0 = first emulated frame after boot)
+//     BUTTONS  '+'-joined set of: up down left right a b c d start l r   (or: none)
+//   The pad state applies from the start of FRAME (before it is emulated) and persists
+//   until the next entry. '#' starts a comment; blank lines are ignored.
+//   Example:
+//     0    none
+//     120  start
+//     126  none
+//     200  right+a
+//   While a script is active, real keyboard/controller pad input is ignored.
+
+struct InputScriptEntry
+{
+	uint64_t frame;
+	int buttons;
+};
+
+static bool load_input_script(const std::string& path, std::vector<InputScriptEntry>& entries)
+{
+	static const std::pair<const char*, int> BUTTON_NAMES[] = {
+		{"up", Input::PAD_UP},	 {"down", Input::PAD_DOWN}, {"left", Input::PAD_LEFT}, {"right", Input::PAD_RIGHT},
+		{"a", Input::PAD_A},	 {"b", Input::PAD_B},		{"c", Input::PAD_C},	   {"d", Input::PAD_D},
+		{"start", Input::PAD_START}, {"l", Input::PAD_L1},	{"r", Input::PAD_R1},	   {"none", 0},
+	};
+
+	std::ifstream file(path);
+	if (!file.is_open())
+	{
+		Log::error("Couldn't open input script %s", path.c_str());
+		return false;
+	}
+
+	std::string line;
+	int line_number = 0;
+	while (std::getline(file, line))
+	{
+		line_number++;
+		auto comment = line.find('#');
+		if (comment != std::string::npos) line.resize(comment);
+
+		std::istringstream tokens(line);
+		std::string frame_str, buttons_str, extra;
+		if (!(tokens >> frame_str)) continue;  // blank line
+		if (!(tokens >> buttons_str) || (tokens >> extra) ||
+			!std::all_of(frame_str.begin(), frame_str.end(), [](unsigned char c) { return std::isdigit(c); }))
+		{
+			Log::error("Input script %s line %d: expected 'FRAME BUTTONS'", path.c_str(), line_number);
+			return false;
+		}
+
+		InputScriptEntry entry = {std::stoull(frame_str), 0};
+		std::transform(buttons_str.begin(), buttons_str.end(), buttons_str.begin(), [](unsigned char c) {
+			return (char)std::tolower(c);
+		});
+		std::stringstream names(buttons_str);
+		std::string name;
+		while (std::getline(names, name, '+'))
+		{
+			bool found = false;
+			for (const auto& [button_name, mask] : BUTTON_NAMES)
+			{
+				if (name == button_name)
+				{
+					entry.buttons |= mask;
+					found = true;
+					break;
+				}
+			}
+			if (!found)
+			{
+				Log::error("Input script %s line %d: unknown button '%s'", path.c_str(), line_number, name.c_str());
+				return false;
+			}
+		}
+		entries.push_back(entry);
+	}
+
+	std::stable_sort(entries.begin(), entries.end(), [](const InputScriptEntry& a, const InputScriptEntry& b) {
+		return a.frame < b.frame;
+	});
+	return true;
+}
+
+static void automation_screenshot(const fs::path& dir, uint64_t frame)
+{
+	char name[32];
+	snprintf(name, sizeof(name), "frame_%06llu.png", (unsigned long long)frame);
+	fs::path path = dir / name;
+	bool ok = imagew::save_image_16bpp(
+		imagew::IMAGE_TYPE_PNG, path, Video::DISPLAY_WIDTH, Video::get_display_scanlines(), Video::get_display_output()
+	);
+	printf("[SHOT] %s%s\n", path.string().c_str(), ok ? "" : " (FAILED)");
+	fflush(stdout);
+}
+
 int main(int argc, char** argv)
 {
 	bool has_quit = false;
@@ -440,6 +547,38 @@ int main(int argc, char** argv)
 	config.emulator.printer_correct_aspect_ratio = args.printer_correct_aspect_ratio;
 
 	Log::set_level(args.verbose ? Log::VERBOSE : Log::INFO);
+
+	// Dev automation setup (all no-ops unless the corresponding command line options are given)
+	bool automation = args.automation_enabled();
+	if (automation)
+	{
+		// Never pause on focus loss, so automated runs don't stall in the background
+		args.run_in_background = true;
+	}
+	if (args.no_sram_write)
+	{
+		Cart::set_sram_write_enabled(false);
+	}
+	std::vector<InputScriptEntry> input_script;
+	bool use_input_script = !args.input_script.empty();
+	if (use_input_script)
+	{
+		if (!load_input_script(args.input_script, input_script))
+		{
+			exit(1);
+		}
+		Input::set_script_mode(true);
+	}
+	size_t input_script_pos = 0;
+	int input_script_buttons = 0;
+	std::set<uint64_t> screenshot_frames(args.screenshot_at.begin(), args.screenshot_at.end());
+	fs::path screenshot_dir = args.screenshot_dir.empty() ? fs::current_path() : fs::path(args.screenshot_dir);
+	if (args.screenshot_every || !screenshot_frames.empty())
+	{
+		std::error_code ec;
+		fs::create_directories(screenshot_dir, ec);
+	}
+	uint64_t emulated_frames = 0;
 
 	// Plug in the emulated mouse at startup if configured; F2/F1 switch between mouse and gamepad at runtime
 	Input::set_mouse_plugged(args.mouse || args.autodrive);
@@ -530,13 +669,43 @@ int main(int argc, char** argv)
 			draw_frames = 1;
 		}
 
+		if (args.headless_fast)
+		{
+			// Unthrottled: one frame per loop iteration, never considered behind
+			last_frame_ticks = now_ticks;
+			draw_frames = 1;
+		}
+
 		if (draw_frames && !is_paused && config.cart.is_loaded())
 		{
 			while (draw_frames > 0)
 			{
+				if (use_input_script)
+				{
+					while (input_script_pos < input_script.size() &&
+						   input_script[input_script_pos].frame <= emulated_frames)
+					{
+						input_script_buttons = input_script[input_script_pos++].buttons;
+					}
+					Input::set_scripted_pad(input_script_buttons);
+				}
+
 				System::run();
 				Autodrive::run_frame();
 				draw_frames--;
+
+				if ((args.screenshot_every && emulated_frames % args.screenshot_every == 0) ||
+					screenshot_frames.count(emulated_frames))
+				{
+					automation_screenshot(screenshot_dir, emulated_frames);
+				}
+				emulated_frames++;
+
+				if (args.exit_after_frames && emulated_frames >= args.exit_after_frames)
+				{
+					has_quit = true;
+					break;
+				}
 			}
 			SDL::update(System::get_display_output(), Video::get_display_scanlines(), Video::get_background_color());
 		}

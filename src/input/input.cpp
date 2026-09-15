@@ -15,6 +15,11 @@ static std::unordered_map<int, MouseButton> mouse_bindings;
 //re-initialization (reboot, cart load).
 static bool mouse_plugged;
 
+//Dev automation: pad driven by an input script instead of real input
+static bool script_mode = false;
+static const int ALL_PAD_BUTTONS = PAD_START | PAD_L1 | PAD_R1 | PAD_A | PAD_B | PAD_C | PAD_D | PAD_UP | PAD_DOWN |
+								   PAD_LEFT | PAD_RIGHT;
+
 void initialize()
 {
 	//Indicate the gamepad (or mouse, when plugged) is connected
@@ -28,6 +33,7 @@ void shutdown()
 
 void set_controller_state(int button, bool pressed)
 {
+	if (script_mode) return;
 	auto binding = controller_bindings.find(button);
 	if (binding == controller_bindings.end())
 	{
@@ -40,6 +46,7 @@ void set_controller_state(int button, bool pressed)
 
 void set_key_state(int key, bool pressed)
 {
+	if (script_mode) return;
 	auto binding = key_bindings.find(key);
 	if (binding == key_bindings.end())
 	{
@@ -76,6 +83,17 @@ void set_mouse_plugged(bool plugged)
 bool is_mouse_plugged()
 {
 	return mouse_plugged;
+}
+
+void set_script_mode(bool enabled)
+{
+	script_mode = enabled;
+}
+
+void set_scripted_pad(int buttons)
+{
+	LoopyIO::update_pad(ALL_PAD_BUTTONS, false);
+	LoopyIO::update_pad(buttons & ALL_PAD_BUTTONS, true);
 }
 
 void add_key_binding(int code, PadButton pad_button)

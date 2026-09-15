@@ -37,6 +37,11 @@ void move_mouse(int delta_x, int delta_y);
 void set_mouse_plugged(bool plugged);
 bool is_mouse_plugged();
 
+//Dev automation: in script mode, keyboard/controller pad input is ignored and the pad
+//state is driven only by set_scripted_pad (a mask of PadButton values, PAD_PRESENCE excluded)
+void set_script_mode(bool enabled);
+void set_scripted_pad(int buttons);
+
 void add_key_binding(int key, PadButton pad_button);
 void add_controller_binding(int key, PadButton pad_button);
 void add_mouse_binding(int code, MouseButton mouse_button);

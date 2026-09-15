@@ -4,6 +4,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 
 #include "imgwriter.h"
 #include "input/input.h"
@@ -62,6 +63,18 @@ void parse_commandline(int argc, char** argv, Args& args)
 		("autodrive", "Let a cooperating cartridge drive the emulated mouse (implies plugging the mouse in)")
 		("cart", po::value<std::string>(), "Cartridge to load (--cart can be omitted, use path to ROM as first positional argument)" );
 
+	// Dev automation options (not part of upstream LoopyMSE)
+	po::options_description automation_opts("Dev automation");
+	automation_opts.add_options()
+		("screenshot-every", po::value<uint64_t>()->default_value(0), "Save the raw display buffer every N emulated frames (0 = off)")
+		("screenshot-at", po::value<std::string>(), "Comma-separated emulated frame numbers to capture")
+		("screenshot-dir", po::value<std::string>(), "Directory for automated screenshots (default: current directory)")
+		("exit-after-frames", po::value<uint64_t>()->default_value(0), "Quit cleanly after N emulated frames (0 = never)")
+		("input-script", po::value<std::string>(), "Drive the gamepad from a frame-based script file (ignores real pad input)")
+		("headless-fast", "Run emulation as fast as possible (no frame throttling or vsync)")
+		("no-sram-write", "Never write SRAM back to the cartridge .sav file");
+	commandline_opts.add(automation_opts);
+
 	po::variables_map vm;
 	po::positional_options_description positional_options;
 	positional_options.add("cart", -1);
@@ -90,6 +103,32 @@ void parse_commandline(int argc, char** argv, Args& args)
 	if (vm.count("cart")) args.cart = vm["cart"].as<std::string>();
 	if (vm.count("autodrive")) args.autodrive = true;
 	args.verbose = vm.count("verbose");
+
+	args.screenshot_every = vm["screenshot-every"].as<uint64_t>();
+	args.exit_after_frames = vm["exit-after-frames"].as<uint64_t>();
+	if (vm.count("screenshot-dir")) args.screenshot_dir = vm["screenshot-dir"].as<std::string>();
+	if (vm.count("input-script")) args.input_script = vm["input-script"].as<std::string>();
+	args.headless_fast = vm.count("headless-fast") > 0;
+	args.no_sram_write = vm.count("no-sram-write") > 0;
+	if (vm.count("screenshot-at"))
+	{
+		std::stringstream list(vm["screenshot-at"].as<std::string>());
+		std::string item;
+		while (std::getline(list, item, ','))
+		{
+			size_t start = item.find_first_not_of(" \t");
+			if (start == std::string::npos) continue;
+			try
+			{
+				args.screenshot_at.push_back(std::stoull(item.substr(start)));
+			}
+			catch (std::exception&)
+			{
+				Log::error("Invalid frame number '%s' in --screenshot-at", item.c_str());
+				exit(1);
+			}
+		}
+	}
 }
 
 const std::unordered_map<std::string, Input::PadButton> KEYBOARD_CONFIG_KEY_TO_PAD_ENUM = {
