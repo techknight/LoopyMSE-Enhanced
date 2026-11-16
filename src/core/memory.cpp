@@ -67,4 +67,16 @@ uint8_t** get_sh2_pagetable()
 	return state->sh2_pagetable.data();
 }
 
+void save_state(::State::Writer& w)
+{
+	w.section("ram");
+	w.put(state->ram);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("ram");
+	r.get(state->ram);
+}
+
 }

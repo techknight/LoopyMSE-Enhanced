@@ -20,6 +20,21 @@
 namespace SH2::Bus
 {
 
+// A word or longword at a misaligned address: the SH-1 takes a CPU address
+// error (exception 9). DMA has its own rules and is not checked.
+static void misaligned(uint32_t addr, int size, bool write)
+{
+	if (OCPM::DMAC::is_dma_access()) return;
+	Log::fault(
+		"[SH2] address error: %s%d at %08X by the instruction at %08X", write ? "write" : "read", size * 8, addr,
+		sh2.executing_addr
+	);
+	sh2.address_error = true;
+}
+
+#define ALIGN_CHECK(size, write) \
+	if (addr & (size - 1)) misaligned(addr, size, write);
+
 // Console timing model: a data access by the executing instruction (fetches
 // are read outside begin/end, DMA is priced by the controller).
 #define COST(size, write, value)                                                                                       \
@@ -108,6 +123,7 @@ uint8_t read8(uint32_t addr)
 
 uint16_t read16(uint32_t addr)
 {
+	ALIGN_CHECK(2, false);
 	COST(2, false, 0);
 	addr = translate_addr(addr);
 	uint8_t* mem = sh2.pagetable[addr >> 12];
@@ -123,6 +139,7 @@ uint16_t read16(uint32_t addr)
 
 uint32_t read32(uint32_t addr)
 {
+	ALIGN_CHECK(4, false);
 	COST(4, false, 0);
 	addr = translate_addr(addr);
 	uint8_t* mem = sh2.pagetable[addr >> 12];
@@ -153,6 +170,7 @@ void write8(uint32_t addr, uint8_t value)
 
 void write16(uint32_t addr, uint16_t value)
 {
+	ALIGN_CHECK(2, true);
 	COST(2, true, value);
 	addr = translate_addr(addr);
 	if (Watch::writes_active) Watch::on_write(addr, 2, value);
@@ -168,6 +186,7 @@ void write16(uint32_t addr, uint16_t value)
 
 void write32(uint32_t addr, uint32_t value)
 {
+	ALIGN_CHECK(4, true);
 	COST(4, true, value);
 	addr = translate_addr(addr);
 	if (Watch::writes_active) Watch::on_write(addr, 4, value);

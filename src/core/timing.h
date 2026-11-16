@@ -4,6 +4,12 @@
 #include <limits>
 #include <cstdint>
 
+namespace State
+{
+class Writer;
+class Reader;
+}
+
 namespace Timing
 {
 
@@ -66,6 +72,9 @@ int64_t calc_slice_length(int id);
 int64_t get_timestamp(int id = -1);
 
 UnitCycle convert_cpu(int64_t cycles);
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 template <int FREQ> UnitCycle convert(int64_t num)
 {

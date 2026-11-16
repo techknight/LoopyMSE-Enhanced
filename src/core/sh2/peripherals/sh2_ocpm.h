@@ -1,8 +1,14 @@
 #pragma once
 #include <cstdint>
 
+#include "core/state.h"
+
 namespace SH2::OCPM
 {
+
+// On-chip RAM, the bus controller and every on-chip peripheral
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int IO_BASE_ADDR = 0x05000000;
 constexpr static int IO_END_ADDR = 0x06000000;

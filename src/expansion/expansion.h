@@ -1,5 +1,6 @@
 #pragma once
 #include "core/config.h"
+#include "core/state.h"
 
 namespace Expansion
 {
@@ -9,6 +10,8 @@ constexpr uint32_t MAPPED_END = 0x040B0000;
 
 void initialize(Config::CartInfo& cart);
 void shutdown();
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 uint8_t exp_read8(uint32_t addr);
 uint16_t exp_read16(uint32_t addr);

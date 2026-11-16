@@ -79,6 +79,18 @@ void set_trace(bool enabled)
 	trace = enabled;
 }
 
+void save_state(::State::Writer& w)
+{
+	w.section("loopyio");
+	w.put(state);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("loopyio");
+	r.get(state);
+}
+
 uint16_t reg_read16(uint32_t addr)
 {
 	uint16_t value = read16_impl(addr);
@@ -261,14 +273,22 @@ void update_print_temp()
 	state.print_temp = bits_temp << 6;
 }
 
+//The sticker cassette in the printer: 0 = none, otherwise its type (1 = XS-11,
+//the type the BIOS print hooks emulate)
+static int seal_cassette = 1;
+
+void set_seal_cassette(int type)
+{
+	seal_cassette = type & 7;
+}
+
 void update_sensors()
 {
 	//Stock mainboard is always configured for NTSC
 	constexpr int region_jumper = 1;
 
-	//BIOS hooks allow simulated printing of XS-11 type seals
-	constexpr bool seal_cartridge_present = true;
-	constexpr int seal_cartridge_type = 1;
+	const bool seal_cartridge_present = seal_cassette != 0;
+	const int seal_cartridge_type = seal_cassette;
 
 	//Set sensors for appropriate idle state
 	int print_mech_sensors = seal_cartridge_present ? 0b100 : 0b011;

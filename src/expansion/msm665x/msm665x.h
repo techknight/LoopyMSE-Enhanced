@@ -18,5 +18,7 @@ bool is_enabled();
 void initialize(std::string rom_path);
 void shutdown();
 void write8(uint32_t addr, uint8_t value);
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 }  // namespace Expansion::MSM665X

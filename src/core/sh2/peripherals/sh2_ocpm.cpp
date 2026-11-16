@@ -190,6 +190,30 @@ void io_write32(uint32_t addr, uint32_t value)
 	WRITE_DOUBLEWORD(io, addr, value);
 }
 
+void save_state(State::Writer& w)
+{
+	w.section("ocpm");
+	w.put(oram);
+	w.put(bsc);
+	DMAC::save_state(w);
+	INTC::save_state(w);
+	PFC::save_state(w);
+	Serial::save_state(w);
+	Timer::save_state(w);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("ocpm");
+	r.get(oram);
+	r.get(bsc);
+	DMAC::load_state(r);
+	INTC::load_state(r);
+	PFC::load_state(r);
+	Serial::load_state(r);
+	Timer::load_state(r);
+}
+
 uint8_t oram_read8(uint32_t addr)
 {
 	return oram[addr & 0x3FF];

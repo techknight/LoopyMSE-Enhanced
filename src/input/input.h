@@ -41,6 +41,9 @@ void set_mouse_button_state(int button, bool pressed);
 void move_mouse(int delta_x, int delta_y);
 void set_user_input_blocked(bool blocked);
 bool is_user_input_blocked();
+// After every emulated frame: lets go of buttons released before the game
+// could see them pressed (each press lasts at least one frame)
+void end_of_frame();
 
 // Input from automation (scripts, the control channel, autodrive). Always
 // delivered: the whole pad state (PadButton mask), mouse buttons (MouseButton

@@ -1,8 +1,13 @@
 #pragma once
 #include <cstdint>
 
+#include "core/state.h"
+
 namespace LoopyIO
 {
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int BASE_ADDR = 0x0405D000;
 constexpr static int END_ADDR = 0x0405E000;
@@ -29,5 +34,9 @@ void update_sensors();
 
 // Log every register access with the line and the program counter.
 void set_trace(bool enabled);
+
+// The sticker cassette reported to the program: 0 = none, 1-7 = its type
+// (1 is XS-11, the only type the printer emulation produces prints for).
+void set_seal_cassette(int type);
 
 }

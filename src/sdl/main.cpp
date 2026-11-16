@@ -554,6 +554,65 @@ std::string take_shot(const std::string& name)
 	return path.string();
 }
 
+fs::path state_slot_path(int slot)
+{
+	fs::path rom = config.cart.rom_path;
+	fs::path dir = !args.state_dir.empty()		? fs::path(args.state_dir)
+				   : !output_dir.empty()		? output_dir
+				   : rom.has_parent_path()		? fs::absolute(rom).parent_path()
+												: PREFS_PATH;
+	fs::path name = rom.filename();
+	name.replace_extension(".state" + std::to_string(slot));
+	return dir / name;
+}
+
+bool save_state_file(const fs::path& path, std::string& error)
+{
+	if (!config.cart.is_loaded())
+	{
+		error = "no cartridge is running";
+		return false;
+	}
+	std::vector<uint8_t> data = System::save_state(config, frame);
+	std::error_code ec;
+	if (path.has_parent_path()) fs::create_directories(path.parent_path(), ec);
+	std::ofstream file(path, std::ios::binary);
+	if (!file.is_open() || !file.write((const char*)data.data(), data.size()))
+	{
+		error = "cannot write " + path.string();
+		return false;
+	}
+	Log::info("Saved state at frame %llu to %s", (unsigned long long)frame, path.string().c_str());
+	return true;
+}
+
+bool load_state_file(const fs::path& path, std::string& error)
+{
+	if (!config.cart.is_loaded())
+	{
+		error = "no cartridge is running";
+		return false;
+	}
+	std::vector<uint8_t> data;
+	if (!load_file(data, path))
+	{
+		error = "cannot read " + path.string();
+		return false;
+	}
+	uint64_t loaded_frame = 0;
+	if (!System::load_state(config, data, loaded_frame, error))
+	{
+		error = path.string() + ": " + error;
+		return false;
+	}
+	frame = loaded_frame;
+	Log::set_frame(frame);
+	Autodrive::reset();
+	last_frame_ticks = SDL_GetPerformanceCounter();
+	Log::info("Loaded state of frame %llu from %s", (unsigned long long)frame, path.string().c_str());
+	return true;
+}
+
 // Memory dumps for the "dump" command: raw bytes as the CPU sees them.
 bool dump_memory(const std::string& what, const std::string& name, std::string& error)
 {
@@ -625,17 +684,27 @@ void apply_bindings()
 	}
 }
 
+// Read emulated memory from outside the CPU, a byte at a time (any address,
+// no address errors).
+uint32_t peek32(uint32_t addr)
+{
+	uint32_t value = 0;
+	for (int i = 0; i < 4; i++) value = (value << 8) | SH2::Bus::read8(addr + i);
+	return value;
+}
+
 void run_frame()
 {
 	if (!args.profile_file.empty() && frame == args.profile_from)
 	{
 		SH2::profile_enable(true);
-		if (args.profile_watch) prof_watch_start = SH2::Bus::read32(args.profile_watch);
+		if (args.profile_watch) prof_watch_start = peek32(args.profile_watch);
 	}
 
 	DebugTools::begin_frame(frame);
 	System::run();
 	Autodrive::run_frame();
+	Input::end_of_frame();
 	frame++;
 	Log::set_frame(frame);
 	Recorder::video_frame(frame, Video::get_display_output(), Video::get_display_scanlines());
@@ -649,7 +718,7 @@ void run_frame()
 			char buf[96];
 			snprintf(
 				buf, sizeof buf, "watch %08X start %u end %u fields %llu", (unsigned)args.profile_watch,
-				(unsigned)prof_watch_start, (unsigned)SH2::Bus::read32(args.profile_watch),
+				(unsigned)prof_watch_start, (unsigned)peek32(args.profile_watch),
 				(unsigned long long)(args.profile_to - args.profile_from)
 			);
 			note = buf;
@@ -714,6 +783,19 @@ void handle_event(SDL_Event& e)
 				}
 			}
 			break;
+		case SDLK_F5:
+		case SDLK_F6:
+		case SDLK_F7:
+		case SDLK_F8:
+		{
+			// F5-F8 load slots 1-4, Shift+F5-F8 save them
+			int slot = 1 + (int)(keycode - SDLK_F5);
+			std::string error;
+			bool ok = (e.key.keysym.mod & KMOD_SHIFT) ? save_state_file(state_slot_path(slot), error)
+													  : load_state_file(state_slot_path(slot), error);
+			if (!ok) Log::error("Savestate slot %d: %s", slot, error.c_str());
+			break;
+		}
 		case SDLK_F11:
 			SDL::toggle_fullscreen();
 			break;
@@ -977,6 +1059,12 @@ int main(int argc, char** argv)
 		return std::string(buf);
 	};
 	hooks.dump = dump_memory;
+	hooks.save_state = [](const std::string& name, std::string& error) {
+		return save_state_file(output_file(name), error);
+	};
+	hooks.load_state = [](const std::string& name, std::string& error) {
+		return load_state_file(name, error);
+	};
 	Automation::initialize(hooks);
 	Automation::set_scheduled_shots(args.shot_every, args.shot_at);
 
@@ -995,6 +1083,7 @@ int main(int argc, char** argv)
 		return Automation::EXIT_USAGE;
 	}
 	LoopyIO::set_trace(args.trace_io);
+	LoopyIO::set_seal_cassette(args.printer_cassette);
 	Video::set_raster_warnings(args.raster_warnings);
 
 	Recorder::Settings rec;
@@ -1032,6 +1121,15 @@ int main(int argc, char** argv)
 	if (config.cart.is_loaded())
 	{
 		System::initialize(config);
+		if (!args.load_state.empty())
+		{
+			std::string error;
+			if (!load_state_file(args.load_state, error))
+			{
+				Log::error("%s", error.c_str());
+				return Automation::EXIT_USAGE;
+			}
+		}
 	}
 
 	std::string title_suffix;
