@@ -9,13 +9,16 @@ reports compare line for line.
 
 ## What it measures
 
-| # | Question | Reference says | Emulator (model) says |
-| --- | --- | --- | --- |
-| 1 | Frame period | 1365 VDP cycles a line at 21.477272 MHz, 263 lines: 267,441.6 CPU cycles (59.826 Hz) | was 266,419 (60.06 Hz) |
-| 2 | HCOUNT / VCOUNT (0x0C058002/4) | HCOUNT 0x000-0x101 (4 VDP cycles a step), then 0x1AC-0x1FF; VCOUNT steps at that jump; after the last active line it becomes 0x1D9 (224 lines) or 0x1E9 (240) and counts to 0x1FF | (same in the current source) |
-| 3 | Fetch and memory costs | BIOS fetch 1 cycle; work RAM write in the open 1 KB row 1 cycle | console timing model: BIOS fetch 3, open-row write 2 |
-| 4 | Raster artifacts | palette writes clean; palette reads, and tile VRAM accesses while a BG/OBJ layer is on, snow | the author's ports saw dots from palette writes on a console |
-| 5 | XN-110 mouse | counters saturate at +2047/-2048; all six bytes of 0x0C05D010/12/14 read bit 7 detect, bit 6 right, bit 4 left (active-low), bits 3-0 raw gray code | counters wrap; pad bits of 0x010/12/14 are garbage; bit 15 of 0x010 is presence, bits 12-14 the buttons; no counts while the pad scan is armed too |
+| # | Question | Reference says | Emulator said before | A console says (`results/hardware`) |
+| --- | --- | --- | --- | --- |
+| 1 | Frame period | 1365 VDP cycles a line at 21.477272 MHz, 263 lines: 267,441.6 CPU cycles (59.826 Hz) | 266,419 (60.06 Hz) | **267,892.4** CPU cycles, 263 lines (0.17% longer than the reference) |
+| 2 | HCOUNT / VCOUNT (0x0C058002/4) | HCOUNT 0x000-0x101 (4 VDP cycles a step), then 0x1AC-0x1FF; VCOUNT steps at that jump; after the last active line it becomes 0x1D9 (224 lines) or 0x1E9 (240) and counts to 0x1FF | (the reference, from the source) | the reference |
+| 3 | Fetch and memory costs | BIOS fetch 1 cycle; work RAM write in the open 1 KB row 1 cycle | console timing model: BIOS fetch 3, open-row write 2 | BIOS fetch 1 (the reference); open-row write 2.55 (the model, plus refresh) |
+| 4 | Raster artifacts | palette writes clean; palette reads, and tile VRAM accesses while a BG/OBJ layer is on, snow | drawn clean; the author's ports saw dots from palette writes on a console | everything snows: palette writes (white dots, any entry), palette reads (the colour read), OAM writes (sprite rows lost), tile VRAM reads and writes (black dashes, BG tiles lost, holes in sprites); the backdrop never |
+| 5 | XN-110 mouse | counters saturate at +2047/-2048; all six bytes of 0x0C05D010/12/14 read bit 7 detect, bit 6 right, bit 4 left (active-low), bits 3-0 raw gray code | counters wrap; pad bits of 0x010/12/14 are garbage; bit 15 of 0x010 is presence, bits 12-14 the buttons; no counts while the pad scan is armed too | the reference (gray code 00, 01, 11, 10 counts +), except that no counts accumulate while the pad scan is armed too |
+
+LoopyMSE-Enhanced follows the console's answers since; `results/emulator*`
+are runs of the emulator after the change.
 
 How:
 
@@ -72,9 +75,9 @@ Drive take; 32 KB of save RAM declared in its header) and
 
 ## Running it on the console
 
-1. Put `LoopyProbe.bin` on the Floopy Drive **under its own name**, so it
-   gets a save file of its own (the probe uses all 32 KB of it and clears
-   it when a run starts).
+1. Flash `LoopyProbe.bin` to your flash cartridge (on the Floopy Drive this
+   erases the cartridge, save RAM included, so download any save you want
+   to keep first).
 2. Plug the XN-110 mouse into the controller port (it replaces the pad).
    Without a mouse the probe still runs, driven by the pad, and logs "no
    mouse".
@@ -90,8 +93,10 @@ Drive take; 32 KB of save RAM declared in its header) and
      the three-second countdown that follows (start moving, or press and
      hold the button), until the next screen appears. The click that starts
      a phase is separate from any button the phase asks you to hold.
-4. At ALL DONE, turn the console off and dump the probe's `.sav`. Put it in
-   `results/hardware/`.
+4. At ALL DONE, turn the console off, connect the cartridge to the computer
+   and download its save RAM (on the Floopy Drive, the download button; it
+   gives the whole save RAM, 128 KB, of which the log is the first 32 KB).
+   Put it in `results/hardware/` with your photographs.
 
 A finished log survives a power cycle: the probe then shows LOG COMPLETE
 and does nothing else. To erase it and run again, hold a mouse button (or
@@ -188,8 +193,8 @@ Standard library only. It finds the log anywhere in the file, in either
 16-bit byte order, decodes a partial log as far as it goes (and says where
 the run stopped), and ends with one verdict line per finding, for example
 "Q1: frame period 267,441.6 cycles (+0 ppm from the reference), 263.00
-lines: matches the reference", "Q5: mouse counters WRAP (12-bit; the
-emulator's model)". `-v` also lists every record.
+lines: matches the reference", "Q5: mouse counters SATURATE at
++2047/-2048 (reference)". `-v` also lists every record.
 
 ## Results
 
@@ -197,12 +202,18 @@ emulator's model)". `-v` also lists every record.
 results/
   emulator/           LoopyProbe.sav, probe-sram.bin, the shots (*.png), report.txt
   emulator-console/   the same with --timing.model=console
-  hardware/           LoopyProbe.sav from the Floopy Drive, photographs, report.txt
+  hardware/           LoopyProbe.sav (the Floopy Drive's save RAM download),
+                      raster-1.jpg .. raster-7.jpg (the raster tests on a
+                      Sony Trinitron over composite), report.txt
 ```
 
 Each results folder keeps the raw save (`LoopyProbe.sav`, the measurement
 itself), the report made from it (`decode_probe.py -v -o report.txt`) and the
-pictures. The built `LoopyProbe.bin` is kept in the repository too, so the
+pictures. The photographs are reduced to 2000 pixels across; the camera's
+originals are not in the repository. Colours in a photograph are the TV's
+and the camera's (test 5's photograph lost most of its red, while the
+capture shows the bars unchanged): the capture lines in the report are the
+exact colours. The built `LoopyProbe.bin` is kept in the repository too, so the
 probe can be flashed without building it.
 
 ## SRAM log

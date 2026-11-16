@@ -4,6 +4,8 @@
 
 # The results' save files and dumps are kept: they are the measurements
 results/**/*.state
+# Camera originals of the photographs (reduced copies are kept)
+/results/hardware/full-size/
 
 __pycache__/
 *.pyc

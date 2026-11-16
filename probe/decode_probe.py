@@ -58,6 +58,8 @@ REF_FRAME = 1365 * 263 * CPU_HZ / VDP_HZ          # 267,441.6 CPU cycles
 REF_LINE = 1365 * CPU_HZ / VDP_HZ                 # 1,016.9
 OLD_FRAME = 266_419                               # LoopyMSE before (60.06 Hz)
 OLD_LINE = OLD_FRAME / 263
+CONSOLE_FRAME = 267_892.4                         # results/hardware: the author's console,
+                                                  # LoopyMSE-Enhanced's timing since
 
 # screen.c's palette, as the capture should return it (RGB555).
 def rgb(r, g, b):
@@ -233,6 +235,9 @@ def q1_frame(log):
         what = "matches the reference"
     elif abs(per - OLD_FRAME) <= 150:
         what = "matches the old emulator timing (266,419), not the reference"
+    elif abs(per - CONSOLE_FRAME) <= 150:
+        what = ("matches the console measured in results/hardware (267,892.4), "
+                "not the reference")
     else:
         what = "matches neither the reference nor the old emulator timing"
     verdict(1, f"frame period {per:,.1f} cycles ({ppm:+.0f} ppm from the reference), "
@@ -425,9 +430,9 @@ def q3_mem(log):
         extra = calls[16] - calls[13]
         if extra <= 0.5:
             bios_text = (f"BIOS code runs as fast as on-chip RAM ({extra:+.2f} cycles a call): "
-                         "1-cycle fetches, the reference (the emulator model charges 3)")
+                         "1-cycle fetches, the reference (the old console model charged 3)")
         elif abs(f_bios - 3) <= 0.5:
-            bios_text = (f"BIOS fetches about {f_bios:.1f} cycles: the emulator's console model, "
+            bios_text = (f"BIOS fetches about {f_bios:.1f} cycles: the old console model, "
                          "not the reference's 1")
         else:
             bios_text = (f"BIOS fetches about {f_bios:.1f} cycles each "
@@ -545,7 +550,7 @@ def q5_mouse(log):
         all_det = all(v[k] & 0x8080 == 0x8080 for v in idle for k in (1, 2, 3))
         if frac > 0.25:
             text = ("controller bytes change constantly while the mouse is idle "
-                    "(the emulator's garbage model)")
+                    "(the old emulator's garbage model)")
         else:
             text = ("controller bytes stay still while the mouse is idle "
                     "(the reference: raw gray code, changes only with motion)")
@@ -594,7 +599,7 @@ def q5_mouse(log):
                 text = "left button clears bit 4 of the controller bytes, 012 too (reference)"
             elif low & 0x1000:
                 text = (f"left button clears 010 bit 12 (low {low:04X}); 012 does not follow "
-                        "(emulator model: buttons only in 010)")
+                        "(the old emulator model: buttons only in 010)")
             else:
                 text = f"left button: 010 bits that went low {low:04X}"
             verdict(5, text)
@@ -647,7 +652,7 @@ def q5_mouse(log):
         if "saturate" in over and "wrap" not in over:
             verdict(5, "mouse counters SATURATE at +2047/-2048 (reference)")
         elif "wrap" in over and "saturate" not in over:
-            verdict(5, "mouse counters WRAP (12-bit; the emulator's model)")
+            verdict(5, "mouse counters WRAP (12-bit; the old emulator model)")
         else:
             verdict(5, "mouse counters: both pinned and wrapped readings (inconclusive)")
     elif 17 in reads or 19 in reads:

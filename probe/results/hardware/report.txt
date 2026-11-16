@@ -1,0 +1,1070 @@
+results\hardware\LoopyProbe.sav: LoopyProbe log v1, 827 records
+  built Nov 16 2026 12:22:27; phase reached: 254 (done), step 0x00 (working)
+  flags: done, mouse present
+  WCR3 at boot: A800; vertical blanks counted at the last phase change: 16137
+  phases logged (at vertical blank): 1 (1), 2 (3180), 3 (4111), 4 (4415), 5 (4622), 6 (4838), 10 (7067), 11 (7098), 12 (7720), 13 (9397), 14 (10077), 15 (10580), 16 (11010), 17 (12195), 18 (13242), 19 (13842), 20 (14506), 21 (15579), 254 (16137)
+
+== Q1: frame period ==
+   1 frame(s):   267,900 cycles =   267,900.0 a frame (59.7238 Hz at 16 MHz), 263.00 lines a frame,   23,413 cycles a frame in vblank
+   1 frame(s):   267,900 cycles =   267,900.0 a frame (59.7238 Hz at 16 MHz), 263.00 lines a frame,   23,413 cycles a frame in vblank
+   1 frame(s):   267,902 cycles =   267,902.0 a frame (59.7233 Hz at 16 MHz), 263.00 lines a frame,   23,439 cycles a frame in vblank
+   1 frame(s):   267,902 cycles =   267,902.0 a frame (59.7233 Hz at 16 MHz), 263.00 lines a frame,   23,439 cycles a frame in vblank
+   8 frame(s): 2,143,153 cycles =   267,894.1 a frame (59.7251 Hz at 16 MHz), 263.00 lines a frame,   23,431 cycles a frame in vblank
+   8 frame(s): 2,143,129 cycles =   267,891.1 a frame (59.7258 Hz at 16 MHz), 263.00 lines a frame,   23,431 cycles a frame in vblank
+  64 frame(s): 17,145,111 cycles =   267,892.4 a frame (59.7255 Hz at 16 MHz), 263.00 lines a frame,   23,430 cycles a frame in vblank
+  reference: 267,441.8 cycles (1365 x 263 VDP cycles at 21.477272 MHz, 59.826 Hz); old emulator: 266,419 (60.06 Hz)
+  => frame period 267,892.4 cycles (+1685 ppm from the reference), 263.00 lines: matches the console measured in results/hardware (267,892.4), not the reference
+
+== Q2: HCOUNT and VCOUNT ==
+
+-- 240-line mode --
+  12288 samples, about 29 cycles (~9.7 HCOUNT steps) apart
+  HCOUNT: 342 distinct values, 000..1FF; widest gap 101 -> 1AC; 0 values seen in 102..1AB
+  HCOUNT runs (gaps up to 16 merged): 000-101 (258 seen), 1AC-1FF (84 seen)
+  353 forward jumps (max before 101, min after 1AC); 354 wraps (max before 1FF, min after 000)
+    wrap: V 0EC->0EC  H 1FA->004  (29 cycles apart)
+    jump: V 0EC->0EC  H 0F8->1AD  (29 cycles apart)
+    wrap: V 0ED->0ED  H 1FB->005  (29 cycles apart)
+    jump: V 0ED->0EE  H 0FA->1AE  (29 cycles apart)
+    wrap: V 0EE->0EE  H 1FD->007  (29 cycles apart)
+    jump: V 0EE->0EF  H 0FC->1B1  (29 cycles apart)
+    wrap: V 0EF->0EF  H 1FF->009  (31 cycles apart)
+    jump: V 0EF->1E9  H 0FE->1B3  (29 cycles apart)
+  VCOUNT: 353 changes, 263 distinct values, 2 not +1
+    a +1 change came between samples with HCOUNT 0F7-1AD before and 1AD-1B7 after (VCOUNT is read first)
+    VCOUNT 0EF -> 1E9 (HCOUNT 0FE -> 1B3)
+    VCOUNT 0EF -> 1E9 (HCOUNT 0FA -> 1B0)
+  VCOUNT runs: 000-0EF, 1E9-1FF
+  line period 1018.56 cycles over 352 lines (min 994, max 1028); reference 1016.89, old emulator 1013.00
+    sample    26: V 0EC H 0DB T FEB4 | V 0EC H 0E5 T FED1
+    sample    28: V 0EC H 0EF T FEEE | V 0EC H 0F8 T FF0B
+    sample    30: V 0EC H 1AD T FF28 | V 0ED H 1B6 T FF45
+    sample    32: V 0ED H 1C0 T FF62 | V 0ED H 1CA T FF7F
+    sample    34: V 0ED H 1D4 T FF9D | V 0ED H 1DE T FFBA
+    sample   131: V 0EF H 0E1 T 0AB5 | V 0EF H 0EB T 0AD2
+    sample   133: V 0EF H 0F4 T 0AEF | V 0EF H 0FE T 0B0D
+    sample   135: V 1E9 H 1B3 T 0B2A | V 1E9 H 1BD T 0B47
+    sample   137: V 1E9 H 1C6 T 0B64 | V 1E9 H 1D0 T 0B81
+    sample   139: V 1E9 H 1DA T 0B9E | V 1E9 H 1E3 T 0BBB
+  => 240 lines: HCOUNT runs 000..101 then 1AC..1FF (reference); VCOUNT steps at HCOUNT's jump to 1AC (reference); after line 0EF VCOUNT becomes 1E9 (reference); line 1018.6 cycles
+
+-- 224-line mode --
+  12288 samples, about 29 cycles (~9.7 HCOUNT steps) apart
+  HCOUNT: 342 distinct values, 000..1FF; widest gap 101 -> 1AC; 0 values seen in 102..1AB
+  HCOUNT runs (gaps up to 16 merged): 000-101 (258 seen), 1AC-1FF (84 seen)
+  353 forward jumps (max before 101, min after 1AC); 354 wraps (max before 1FF, min after 000)
+    wrap: V 0DC->0DC  H 1F7->001  (29 cycles apart)
+    jump: V 0DC->0DD  H 100->1B4  (29 cycles apart)
+    wrap: V 0DD->0DD  H 1F9->003  (29 cycles apart)
+    jump: V 0DD->0DD  H 0F7->1AC  (29 cycles apart)
+    wrap: V 0DE->0DE  H 1FA->004  (29 cycles apart)
+    jump: V 0DE->0DF  H 0F9->1AE  (29 cycles apart)
+    wrap: V 0DF->0DF  H 1FD->007  (29 cycles apart)
+    jump: V 0DF->1D9  H 0FC->1B0  (29 cycles apart)
+  VCOUNT: 353 changes, 263 distinct values, 2 not +1
+    a +1 change came between samples with HCOUNT 0F8-1AD before and 1AD-1B7 after (VCOUNT is read first)
+    VCOUNT 0DF -> 1D9 (HCOUNT 0FC -> 1B0)
+    VCOUNT 0DF -> 1D9 (HCOUNT 0F9 -> 1AD)
+  VCOUNT runs: 000-0DF, 1D9-1FF
+  line period 1018.55 cycles over 352 lines (min 993, max 1028); reference 1016.89, old emulator 1013.00
+    sample    27: V 0DC H 0E3 T 5639 | V 0DC H 0EC T 5656
+    sample    29: V 0DC H 0F6 T 5673 | V 0DC H 100 T 5690
+    sample    31: V 0DD H 1B4 T 56AD | V 0DD H 1BE T 56CA
+    sample    33: V 0DD H 1C8 T 56E7 | V 0DD H 1D1 T 5704
+    sample    35: V 0DD H 1DB T 5721 | V 0DD H 1E5 T 573F
+    sample   131: V 0DF H 0DF T 621D | V 0DF H 0E8 T 623A
+    sample   133: V 0DF H 0F2 T 6257 | V 0DF H 0FC T 6274
+    sample   135: V 1D9 H 1B0 T 6291 | V 1D9 H 1BA T 62AF
+    sample   137: V 1D9 H 1C4 T 62CC | V 1D9 H 1CE T 62E9
+    sample   139: V 1D9 H 1D7 T 6306 | V 1D9 H 1E1 T 6323
+  => 224 lines: HCOUNT runs 000..101 then 1AC..1FF (reference); VCOUNT steps at HCOUNT's jump to 1AC (reference); after line 0DF VCOUNT becomes 1D9 (reference); line 1018.6 cycles
+
+== Q3: fetch and memory access costs ==
+  BCR 9000  WCR1 B9FD  WCR2 B9B9  WCR3 A800  DCR 5D00  PCR 0000  RCR 0080
+  RTCSR 0088  RTCNT 0038  RTCOR 007A, a refresh about every 244 cycles; VDP MODE 003A, BM_MEM_CTRL 0000
+  VDP IRQ0_NMI_CTRL as the BIOS left it 00C0 (the probe sets 0); DMAOR 0000
+  id  probe                                   cycles a pass  (spread n1/n2)
+   1  nop x16, code in on-chip RAM               21.164       (0/2)
+   2  nop x32, code in on-chip RAM               37.164       (2/2)
+   3  nop x16, code in work RAM                  21.594       (1/3)
+   4  nop x32, code in work RAM                  37.914       (2/5)
+   5  nop x16, code in cartridge ROM             63.164       (2/0)
+   6  nop x32, code in cartridge ROM            111.164       (2/2)
+   7  work RAM read, one address                 29.711       (4/9)
+   8  work RAM write, one address                45.930       (2/0)
+   9  work RAM read, two rows                    61.258       (21/35)
+  10  work RAM write, two rows                   61.258       (18/33)
+  11  on-chip RAM read                           29.164       (2/2)
+  12  cartridge ROM read                         61.164       (2/0)
+  13  8 calls to rts;nop in on-chip RAM          53.148       (4/2)
+  14  8 calls to rts;nop in work RAM             53.727       (9/3)
+  15  8 calls to rts;nop in cartridge ROM        85.148       (2/2)
+  16  8 calls to rts;nop in the BIOS (0x1158)    53.148       (2/0)
+  17  8 calls to rts;nop in the BIOS (0x1652)    53.148       (2/0)
+
+  item                                     measured  reference  emulator model
+  fetch, on-chip RAM (per instruction)         1.00          1               1
+  fetch, work RAM (sequential)                 1.02          1               1
+  fetch, cartridge ROM                         3.00          3               3
+  work RAM read, open row                      1.53          1               1
+  work RAM write, open row                     2.55          1               2
+  work RAM read, row change each time          3.51          3               3
+  work RAM write, row change each time         3.51          3               3
+  on-chip RAM read                             1.50          1               1
+  cartridge ROM read                           3.50          3               3
+
+  a call to rts;nop (jsr, its delay slot, rts, its delay slot), per call:
+    on-chip RAM       6.64 cycles (+0.00 against on-chip RAM)
+    work RAM          6.72 cycles (+0.07 against on-chip RAM)
+    cartridge ROM    10.64 cycles (+4.00 against on-chip RAM)
+    BIOS 0x1158       6.64 cycles (+0.00 against on-chip RAM)
+    BIOS 0x1652       6.64 cycles (+0.00 against on-chip RAM)
+    16-bit fetches a call: 1.98
+  => BIOS code runs as fast as on-chip RAM (+0.00 cycles a call): 1-cycle fetches, the reference (the old console model charged 3)
+  => open-row work RAM write 2.55 cycles (reference 1, model 2)
+  => open-row work RAM read 1.53 cycles (reference and model: 1)
+  => fetch per instruction: on-chip 1.00, work RAM 1.02, cartridge ROM 3.00 cycles
+
+== Q4: display artifacts from VDP accesses during the picture ==
+  control capture of line 120 at the bars' centres: 7C00 03E0 001F 7FE0 03FF 7C1F 4210 (the bars' colours: the capture works)
+  control capture of line 60: 088A 088A 088A 088A 088A 088A 088A (backdrop 088A where no text)
+  control capture of line 190: 1A86 1A86 1A86 1A86 1A86 1A86 1A86
+  control capture of line 211: 088A 088A 7E84 7FF8 088A 088A 088A
+  test 1: no access (the control)
+    line  60:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 120:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 190:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 211:     0 pixels differ in 0 of 4 frames (most 0 in one)
+  test 2: palette write, bar 1's entry (on screen); 47,424 accesses a frame
+    line  60:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 120:   145 pixels differ in 4 of 4 frames (most 37 in one), first at x=3: 7C00 -> 7FFF
+    line 190:   149 pixels differ in 4 of 4 frames (most 41 in one), first at x=2: 63F8 -> 7FFF
+    line 211:    42 pixels differ in 4 of 4 frames (most 12 in one), first at x=26: 7F8C -> 7FFF
+  test 3: palette write, entry 255 (not on screen); 47,416 accesses a frame
+    line  60:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 120:   152 pixels differ in 4 of 4 frames (most 39 in one), first at x=3: 7C00 -> 7FFF
+    line 190:   145 pixels differ in 4 of 4 frames (most 38 in one), first at x=7: 338C -> 7FFF
+    line 211:    39 pixels differ in 4 of 4 frames (most 11 in one), first at x=27: 7FF8 -> 7FFF
+  test 4: palette read, bar 1's entry; 42,512 accesses a frame
+    line  60:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 120:   461 pixels differ in 4 of 4 frames (most 116 in one), first at x=32: 03E0 -> 7C00
+    line 190:   529 pixels differ in 4 of 4 frames (most 133 in one), first at x=0: 1A86 -> 7C00
+    line 211:   137 pixels differ in 4 of 4 frames (most 35 in one), first at x=24: 7E84 -> 7C00
+  test 5: OAM write, sprite 127 (parked); 47,416 accesses a frame
+    line  60:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 120:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 190:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 211:   128 pixels differ in 4 of 4 frames (most 40 in one), first at x=80: 7E84 -> 088A
+  test 6: tile VRAM read; 27,936 accesses a frame
+    line  60:   124 pixels differ in 4 of 4 frames (most 36 in one), first at x=48: 088A -> 0000
+    line 120:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 190:   736 pixels differ in 4 of 4 frames (most 196 in one), first at x=0: 1A86 -> 0000
+    line 211:   235 pixels differ in 4 of 4 frames (most 65 in one), first at x=0: 088A -> 0000
+  test 7: tile VRAM write; 34,288 accesses a frame
+    line  60:   184 pixels differ in 4 of 4 frames (most 56 in one), first at x=32: 088A -> 0000
+    line 120:     0 pixels differ in 0 of 4 frames (most 0 in one)
+    line 190:   899 pixels differ in 4 of 4 frames (most 233 in one), first at x=0: 1A86 -> 0000
+    line 211:   279 pixels differ in 4 of 4 frames (most 88 in one), first at x=24: 7E84 -> 088A
+  => the capture saw artifacts in test 2 (palette write, bar 1's entry (on screen)): 336 pixels; test 3 (palette write, entry 255 (not on screen)): 336 pixels; test 4 (palette read, bar 1's entry): 1127 pixels; test 5 (OAM write, sprite 127 (parked)): 128 pixels; test 6 (tile VRAM read): 1095 pixels; test 7 (tile VRAM write): 1362 pixels
+
+== Q5: the XN-110 mouse ==
+  detection (pad and mouse scan): 0x010 bit 15 on 30 of 30 frames; last 010 D8D8 012 D8D8 014 D8D8
+
+  (a) idle, 120 frames:
+    010: 1 distinct values, changed on 0 of 119 frames; first D8D8
+    012: 1 distinct values, changed on 0 of 119 frames; first D8D8
+    014: 1 distinct values, changed on 0 of 119 frames; first D8D8
+    050: 1 distinct values, changed on 0 of 119 frames; first 5000
+    052: 1 distinct values, changed on 0 of 119 frames; first 0000
+    bit 7 (detect) set, by byte: 010 high 120/120, 010 low 120/120, 012 high 120/120, 012 low 120/120, 014 high 120/120, 014 low 120/120
+  => controller bytes stay still while the mouse is idle (the reference: raw gray code, changes only with motion); bit 7 set in all six bytes (reference)
+
+  (b) circles, 120 frames: sum |dx| 2670, sum |dy| 2457, frames with motion 120
+    010: 93 distinct values; low nibbles (0x0F0F) 93 distinct
+    012: 89 distinct values; low nibbles (0x0F0F) 89 distinct
+    014: 91 distinct values; low nibbles (0x0F0F) 91 distinct
+
+  (c) left held, 60 frames:
+    010: bits that went low 1010, went high 0505 (against idle)
+    012: bits that went low 1010, went high 0505 (against idle)
+    014: bits that went low 1010, went high 0505 (against idle)
+    050: bits that went low 1000, went high 0000 (against idle)
+  => left button clears bit 4 of the controller bytes, 012 too (reference)
+
+  (c) right held, 60 frames:
+    010: bits that went low 4040, went high 0404 (against idle)
+    012: bits that went low 4040, went high 0404 (against idle)
+    014: bits that went low 4040, went high 0404 (against idle)
+    050: bits that went low 4000, went high 0000 (against idle)
+
+  (c) both held, 60 frames:
+    010: bits that went low 5050, went high 0404 (against idle)
+    012: bits that went low 5050, went high 0404 (against idle)
+    014: bits that went low 5050, went high 0404 (against idle)
+    050: bits that went low 5000, went high 0000 (against idle)
+
+  (d) fast right, read every frame: 180 frames, X total +2830, busiest second +1295 counts (direction +)
+    window start, emptied: X 5FFF (-1) Y 0009
+  (d) fast right, read once a second:
+    frame  60: X 524F =  +591 after 60 frames, Y  +235  
+    frame 120: X 563E = +1598 after 60 frames, Y  +163  
+    frame 180: X 54B0 = +1200 after 60 frames, Y   +25  
+    frame 240: X 5633 = +1587 after 60 frames, Y   +14  
+    frame 300: X 57AB = +1963 after 60 frames, Y   +43  
+    the busiest calibration second (1295 counts) did not pass 2047, so these readings may not have overflowed
+
+  (d) fast left, read every frame: 180 frames, X total -13731, busiest second -6976 counts (direction -)
+    window start, emptied: X 5000 (+0) Y 0F2E
+  (d) fast left, read once a second:
+    frame  60: X 5826 = -2010 after 60 frames, Y  -249  
+    frame 120: X 5800 = -2048 after 60 frames, Y  -416  pinned at the limit: SATURATED
+    frame 180: X 5800 = -2048 after 60 frames, Y  -236  pinned at the limit: SATURATED
+    frame 240: X 5800 = -2048 after 60 frames, Y  -349  pinned at the limit: SATURATED
+    frame 300: X 5800 = -2048 after 60 frames, Y  -310  pinned at the limit: SATURATED
+  => mouse counters SATURATE at +2047/-2048 (reference)
+
+  (e) |dx|+|dy| with pad and mouse scan both armed: 0; mouse scan alone: 3688 (frames moved 0 / 171)
+  => no counts accumulate with the pad scan also armed (the emulator's model)
+
+== verdicts ==
+  Q1: frame period 267,892.4 cycles (+1685 ppm from the reference), 263.00 lines: matches the console measured in results/hardware (267,892.4), not the reference
+  Q2: 240 lines: HCOUNT runs 000..101 then 1AC..1FF (reference); VCOUNT steps at HCOUNT's jump to 1AC (reference); after line 0EF VCOUNT becomes 1E9 (reference); line 1018.6 cycles
+  Q2: 224 lines: HCOUNT runs 000..101 then 1AC..1FF (reference); VCOUNT steps at HCOUNT's jump to 1AC (reference); after line 0DF VCOUNT becomes 1D9 (reference); line 1018.6 cycles
+  Q3: BIOS code runs as fast as on-chip RAM (+0.00 cycles a call): 1-cycle fetches, the reference (the old console model charged 3)
+  Q3: open-row work RAM write 2.55 cycles (reference 1, model 2)
+  Q3: open-row work RAM read 1.53 cycles (reference and model: 1)
+  Q3: fetch per instruction: on-chip 1.00, work RAM 1.02, cartridge ROM 3.00 cycles
+  Q4: the capture saw artifacts in test 2 (palette write, bar 1's entry (on screen)): 336 pixels; test 3 (palette write, entry 255 (not on screen)): 336 pixels; test 4 (palette read, bar 1's entry): 1127 pixels; test 5 (OAM write, sprite 127 (parked)): 128 pixels; test 6 (tile VRAM read): 1095 pixels; test 7 (tile VRAM write): 1362 pixels
+  Q5: controller bytes stay still while the mouse is idle (the reference: raw gray code, changes only with motion); bit 7 set in all six bytes (reference)
+  Q5: left button clears bit 4 of the controller bytes, 012 too (reference)
+  Q5: mouse counters SATURATE at +2047/-2048 (reference)
+  Q5: no counts accumulate with the pad scan also armed (the emulator's model)
+
+== all records ==
+     0  type 01 sub   1  0000 0001 0000 0000 0000 0000 0000
+     1  type 01 sub   2  0000 0C6C 0000 0000 0000 0000 0000
+     2  type 20 sub   1  0004 167C 0000 5B75 0107 0000 0000
+     3  type 20 sub   1  0004 167C 0000 5B75 0107 0001 0000
+     4  type 20 sub   1  0004 167E 0000 5B8F 0107 0002 0000
+     5  type 20 sub   1  0004 167E 0000 5B8F 0107 0003 0000
+     6  type 20 sub   8  0020 B3B1 0002 DC39 0838 0004 0000
+     7  type 20 sub   8  0020 B399 0002 DC39 0838 0005 0000
+     8  type 20 sub  64  0105 9D17 0016 E16F 41C0 0006 0000
+     9  type 01 sub   3  0000 100F 0000 0000 0000 0000 0000
+    10  type 33 sub 240  0002 00EC 00EC 01FA 0004 001D 0000
+    11  type 33 sub 240  0001 00EC 00EC 00F8 01AD 001D 0000
+    12  type 33 sub 240  0002 00ED 00ED 01FB 0005 001D 0000
+    13  type 33 sub 240  0001 00ED 00EE 00FA 01AE 001D 0000
+    14  type 33 sub 240  0002 00EE 00EE 01FD 0007 001D 0000
+    15  type 33 sub 240  0001 00EE 00EF 00FC 01B1 001D 0000
+    16  type 33 sub 240  0002 00EF 00EF 01FF 0009 001F 0000
+    17  type 33 sub 240  0001 00EF 01E9 00FE 01B3 001D 0000
+    18  type 35 sub 240  00EF 01E9 00FE 01B3 0000 0000 0000
+    19  type 35 sub 240  00EF 01E9 00FA 01B0 0000 0000 0000
+    20  type 30 sub 240  3000 0156 0000 01FF 0101 01AC 0000
+    21  type 31 sub 240  0000 0101 0102 0000 0000 0000 0000
+    22  type 31 sub 240  01AC 01FF 0054 0000 0000 0000 0000
+    23  type 32 sub 240  0161 0101 01AC 0162 01FF 0000 0000
+    24  type 34 sub 240  0161 00F7 01AD 01AD 01B7 0107 0002
+    25  type 36 sub 240  0000 00EF 00F0 0000 0000 0000 0000
+    26  type 36 sub 240  01E9 01FF 0017 0000 0000 0000 0000
+    27  type 37 sub 240  0160 0005 7886 03E2 0404 0000 0000
+    28  type 38 sub 240  001A 00EC 00DB FEB4 00EC 00E5 FED1
+    29  type 38 sub 240  001C 00EC 00EF FEEE 00EC 00F8 FF0B
+    30  type 38 sub 240  001E 00EC 01AD FF28 00ED 01B6 FF45
+    31  type 38 sub 240  0020 00ED 01C0 FF62 00ED 01CA FF7F
+    32  type 38 sub 240  0022 00ED 01D4 FF9D 00ED 01DE FFBA
+    33  type 38 sub 240  0083 00EF 00E1 0AB5 00EF 00EB 0AD2
+    34  type 38 sub 240  0085 00EF 00F4 0AEF 00EF 00FE 0B0D
+    35  type 38 sub 240  0087 01E9 01B3 0B2A 01E9 01BD 0B47
+    36  type 38 sub 240  0089 01E9 01C6 0B64 01E9 01D0 0B81
+    37  type 38 sub 240  008B 01E9 01DA 0B9E 01E9 01E3 0BBB
+    38  type 01 sub   4  0000 113F 0000 0000 0000 0000 0000
+    39  type 33 sub 224  0002 00DC 00DC 01F7 0001 001D 0000
+    40  type 33 sub 224  0001 00DC 00DD 0100 01B4 001D 0000
+    41  type 33 sub 224  0002 00DD 00DD 01F9 0003 001D 0000
+    42  type 33 sub 224  0001 00DD 00DD 00F7 01AC 001D 0000
+    43  type 33 sub 224  0002 00DE 00DE 01FA 0004 001D 0000
+    44  type 33 sub 224  0001 00DE 00DF 00F9 01AE 001D 0000
+    45  type 33 sub 224  0002 00DF 00DF 01FD 0007 001D 0000
+    46  type 33 sub 224  0001 00DF 01D9 00FC 01B0 001D 0000
+    47  type 35 sub 224  00DF 01D9 00FC 01B0 0000 0000 0000
+    48  type 35 sub 224  00DF 01D9 00F9 01AD 0000 0000 0000
+    49  type 30 sub 224  3000 0156 0000 01FF 0101 01AC 0000
+    50  type 31 sub 224  0000 0101 0102 0000 0000 0000 0000
+    51  type 31 sub 224  01AC 01FF 0054 0000 0000 0000 0000
+    52  type 32 sub 224  0161 0101 01AC 0162 01FF 0000 0000
+    53  type 34 sub 224  0161 00F8 01AD 01AD 01B7 0107 0002
+    54  type 36 sub 224  0000 00DF 00E0 0000 0000 0000 0000
+    55  type 36 sub 224  01D9 01FF 0027 0000 0000 0000 0000
+    56  type 37 sub 224  0160 0005 7883 03E1 0404 0000 0000
+    57  type 38 sub 224  001B 00DC 00E3 5639 00DC 00EC 5656
+    58  type 38 sub 224  001D 00DC 00F6 5673 00DC 0100 5690
+    59  type 38 sub 224  001F 00DD 01B4 56AD 00DD 01BE 56CA
+    60  type 38 sub 224  0021 00DD 01C8 56E7 00DD 01D1 5704
+    61  type 38 sub 224  0023 00DD 01DB 5721 00DD 01E5 573F
+    62  type 38 sub 224  0083 00DF 00DF 621D 00DF 00E8 623A
+    63  type 38 sub 224  0085 00DF 00F2 6257 00DF 00FC 6274
+    64  type 38 sub 224  0087 01D9 01B0 6291 01D9 01BA 62AF
+    65  type 38 sub 224  0089 01D9 01C4 62CC 01D9 01CE 62E9
+    66  type 38 sub 224  008B 01D9 01D7 6306 01D9 01E1 6323
+    67  type 01 sub   5  0000 120E 0000 0000 0000 0000 0000
+    68  type 10 sub   0  9000 B9FD B9B9 A800 5D00 0000 0080
+    69  type 10 sub   1  0088 0038 007A 003A 0000 00C0 0000
+    70  type 41 sub   0  0F00 00B0 0900 0400 0000 0000 0000
+    71  type 40 sub   1  0020 02C5 02C5 00A0 0D5A 0D5C 0001
+    72  type 40 sub   2  0020 04C5 04C7 00A0 175A 175C 0001
+    73  type 40 sub   3  0020 02D9 02DA 00A0 0DA5 0DA8 0002
+    74  type 40 sub   4  0020 04E2 04E4 00A0 17D7 17DC 0002
+    75  type 40 sub   5  0020 0805 0807 00A0 279A 279A 0003
+    76  type 40 sub   6  0020 0E05 0E07 00A0 459A 459C 0003
+    77  type 40 sub   7  0020 03D6 03DA 00A0 12B1 12BA 0001
+    78  type 40 sub   8  0020 05DC 05DE 00A0 1CD3 1CD3 0001
+    79  type 40 sub   9  0020 07C7 07DC 00A0 2668 268B 0001
+    80  type 40 sub  10  0020 07C7 07D9 00A0 2668 2689 0001
+    81  type 40 sub  11  0020 03C5 03C7 00A0 125A 125C 0001
+    82  type 40 sub  12  0020 07C5 07C7 00A0 265A 265A 0001
+    83  type 40 sub  13  0020 06CD 06D1 00A0 2160 2162 0001
+    84  type 40 sub  14  0020 06E0 06E9 00A0 21BD 21C0 0001
+    85  type 40 sub  15  0020 0ACD 0ACF 00A0 3560 3562 0001
+    86  type 40 sub  16  0020 06CD 06CF 00A0 2160 2160 0001
+    87  type 40 sub  17  0020 06CD 06CF 00A0 2160 2160 0001
+    88  type 01 sub   6  0000 12E6 0000 0000 0000 0000 0000
+    89  type 60 sub   1  003C 0000 0000 0000 FFFF 0000 0000
+    90  type 62 sub  60  088A 088A 088A 088A 088A 088A 088A
+    91  type 60 sub   1  0078 0000 0000 0000 FFFF 0000 0000
+    92  type 62 sub 120  7C00 03E0 001F 7FE0 03FF 7C1F 4210
+    93  type 60 sub   1  00BE 0000 0000 0000 FFFF 0000 0000
+    94  type 62 sub 190  1A86 1A86 1A86 1A86 1A86 1A86 1A86
+    95  type 60 sub   1  00D3 0000 0000 0000 FFFF 0000 0000
+    96  type 62 sub 211  088A 088A 7E84 7FF8 088A 088A 088A
+    97  type 61 sub   1  350C 0000 0000 0000 0000 0000 0000
+    98  type 60 sub   2  003C 0000 0000 0000 FFFF 0000 0000
+    99  type 60 sub   2  0078 0004 0091 0025 0003 7C00 7FFF
+   100  type 60 sub   2  00BE 0004 0095 0029 0002 63F8 7FFF
+   101  type 60 sub   2  00D3 0004 002A 000C 001A 7F8C 7FFF
+   102  type 61 sub   2  1728 0001 0C05 1022 0000 0000 0000
+   103  type 60 sub   3  003C 0000 0000 0000 FFFF 0000 0000
+   104  type 60 sub   3  0078 0004 0098 0027 0003 7C00 7FFF
+   105  type 60 sub   3  00BE 0004 0091 0026 0007 338C 7FFF
+   106  type 60 sub   3  00D3 0004 0027 000B 001B 7FF8 7FFF
+   107  type 61 sub   3  1727 0001 0C05 11FE 0000 0000 0000
+   108  type 60 sub   4  003C 0000 0000 0000 FFFF 0000 0000
+   109  type 60 sub   4  0078 0004 01CD 0074 0020 03E0 7C00
+   110  type 60 sub   4  00BE 0004 0211 0085 0000 1A86 7C00
+   111  type 60 sub   4  00D3 0004 0089 0023 0018 7E84 7C00
+   112  type 61 sub   4  14C2 0002 0C05 1022 0000 0000 0000
+   113  type 60 sub   5  003C 0000 0000 0000 FFFF 0000 0000
+   114  type 60 sub   5  0078 0000 0000 0000 FFFF 0000 0000
+   115  type 60 sub   5  00BE 0000 0000 0000 FFFF 0000 0000
+   116  type 60 sub   5  00D3 0004 0080 0028 0050 7E84 088A
+   117  type 61 sub   5  1727 0001 0C05 01FE 0000 0000 0000
+   118  type 60 sub   6  003C 0004 007C 0024 0030 088A 0000
+   119  type 60 sub   6  0078 0000 0000 0000 FFFF 0000 0000
+   120  type 60 sub   6  00BE 0004 02E0 00C4 0000 1A86 0000
+   121  type 60 sub   6  00D3 0004 00EB 0041 0000 088A 0000
+   122  type 61 sub   6  0DA4 0002 0C04 FFFE 0000 0000 0000
+   123  type 60 sub   7  003C 0004 00B8 0038 0020 088A 0000
+   124  type 60 sub   7  0078 0000 0000 0000 FFFF 0000 0000
+   125  type 60 sub   7  00BE 0004 0383 00E9 0000 1A86 0000
+   126  type 60 sub   7  00D3 0004 0117 0058 0018 7E84 088A
+   127  type 61 sub   7  10BE 0001 0C04 FFFE 0000 0000 0000
+   128  type 01 sub  10  0000 1B9B 0000 0000 0000 0000 0000
+   129  type 50 sub   0  0001 D8D8 D8D8 D8D8 0001 001E 0000
+   130  type 01 sub  11  0000 1BBA 0000 0000 0000 0000 0000
+   131  type 53 sub  11  0000 5000 0000 0000 0000 0000 0000
+   132  type 51 sub  11  0000 D8D8 D8D8 D8D8 5000 0000 0000
+   133  type 51 sub  11  0001 D8D8 D8D8 D8D8 5000 0000 0000
+   134  type 51 sub  11  0002 D8D8 D8D8 D8D8 5000 0000 0000
+   135  type 51 sub  11  0003 D8D8 D8D8 D8D8 5000 0000 0000
+   136  type 51 sub  11  0004 D8D8 D8D8 D8D8 5000 0000 0000
+   137  type 51 sub  11  0005 D8D8 D8D8 D8D8 5000 0000 0000
+   138  type 51 sub  11  0006 D8D8 D8D8 D8D8 5000 0000 0000
+   139  type 51 sub  11  0007 D8D8 D8D8 D8D8 5000 0000 0000
+   140  type 51 sub  11  0008 D8D8 D8D8 D8D8 5000 0000 0000
+   141  type 51 sub  11  0009 D8D8 D8D8 D8D8 5000 0000 0000
+   142  type 51 sub  11  000A D8D8 D8D8 D8D8 5000 0000 0000
+   143  type 51 sub  11  000B D8D8 D8D8 D8D8 5000 0000 0000
+   144  type 51 sub  11  000C D8D8 D8D8 D8D8 5000 0000 0000
+   145  type 51 sub  11  000D D8D8 D8D8 D8D8 5000 0000 0000
+   146  type 51 sub  11  000E D8D8 D8D8 D8D8 5000 0000 0000
+   147  type 51 sub  11  000F D8D8 D8D8 D8D8 5000 0000 0000
+   148  type 51 sub  11  0010 D8D8 D8D8 D8D8 5000 0000 0000
+   149  type 51 sub  11  0011 D8D8 D8D8 D8D8 5000 0000 0000
+   150  type 51 sub  11  0012 D8D8 D8D8 D8D8 5000 0000 0000
+   151  type 51 sub  11  0013 D8D8 D8D8 D8D8 5000 0000 0000
+   152  type 51 sub  11  0014 D8D8 D8D8 D8D8 5000 0000 0000
+   153  type 51 sub  11  0015 D8D8 D8D8 D8D8 5000 0000 0000
+   154  type 51 sub  11  0016 D8D8 D8D8 D8D8 5000 0000 0000
+   155  type 51 sub  11  0017 D8D8 D8D8 D8D8 5000 0000 0000
+   156  type 51 sub  11  0018 D8D8 D8D8 D8D8 5000 0000 0000
+   157  type 51 sub  11  0019 D8D8 D8D8 D8D8 5000 0000 0000
+   158  type 51 sub  11  001A D8D8 D8D8 D8D8 5000 0000 0000
+   159  type 51 sub  11  001B D8D8 D8D8 D8D8 5000 0000 0000
+   160  type 51 sub  11  001C D8D8 D8D8 D8D8 5000 0000 0000
+   161  type 51 sub  11  001D D8D8 D8D8 D8D8 5000 0000 0000
+   162  type 51 sub  11  001E D8D8 D8D8 D8D8 5000 0000 0000
+   163  type 51 sub  11  001F D8D8 D8D8 D8D8 5000 0000 0000
+   164  type 51 sub  11  0020 D8D8 D8D8 D8D8 5000 0000 0000
+   165  type 51 sub  11  0021 D8D8 D8D8 D8D8 5000 0000 0000
+   166  type 51 sub  11  0022 D8D8 D8D8 D8D8 5000 0000 0000
+   167  type 51 sub  11  0023 D8D8 D8D8 D8D8 5000 0000 0000
+   168  type 51 sub  11  0024 D8D8 D8D8 D8D8 5000 0000 0000
+   169  type 51 sub  11  0025 D8D8 D8D8 D8D8 5000 0000 0000
+   170  type 51 sub  11  0026 D8D8 D8D8 D8D8 5000 0000 0000
+   171  type 51 sub  11  0027 D8D8 D8D8 D8D8 5000 0000 0000
+   172  type 51 sub  11  0028 D8D8 D8D8 D8D8 5000 0000 0000
+   173  type 51 sub  11  0029 D8D8 D8D8 D8D8 5000 0000 0000
+   174  type 51 sub  11  002A D8D8 D8D8 D8D8 5000 0000 0000
+   175  type 51 sub  11  002B D8D8 D8D8 D8D8 5000 0000 0000
+   176  type 51 sub  11  002C D8D8 D8D8 D8D8 5000 0000 0000
+   177  type 51 sub  11  002D D8D8 D8D8 D8D8 5000 0000 0000
+   178  type 51 sub  11  002E D8D8 D8D8 D8D8 5000 0000 0000
+   179  type 51 sub  11  002F D8D8 D8D8 D8D8 5000 0000 0000
+   180  type 51 sub  11  0030 D8D8 D8D8 D8D8 5000 0000 0000
+   181  type 51 sub  11  0031 D8D8 D8D8 D8D8 5000 0000 0000
+   182  type 51 sub  11  0032 D8D8 D8D8 D8D8 5000 0000 0000
+   183  type 51 sub  11  0033 D8D8 D8D8 D8D8 5000 0000 0000
+   184  type 51 sub  11  0034 D8D8 D8D8 D8D8 5000 0000 0000
+   185  type 51 sub  11  0035 D8D8 D8D8 D8D8 5000 0000 0000
+   186  type 51 sub  11  0036 D8D8 D8D8 D8D8 5000 0000 0000
+   187  type 51 sub  11  0037 D8D8 D8D8 D8D8 5000 0000 0000
+   188  type 51 sub  11  0038 D8D8 D8D8 D8D8 5000 0000 0000
+   189  type 51 sub  11  0039 D8D8 D8D8 D8D8 5000 0000 0000
+   190  type 51 sub  11  003A D8D8 D8D8 D8D8 5000 0000 0000
+   191  type 51 sub  11  003B D8D8 D8D8 D8D8 5000 0000 0000
+   192  type 51 sub  11  003C D8D8 D8D8 D8D8 5000 0000 0000
+   193  type 51 sub  11  003D D8D8 D8D8 D8D8 5000 0000 0000
+   194  type 51 sub  11  003E D8D8 D8D8 D8D8 5000 0000 0000
+   195  type 51 sub  11  003F D8D8 D8D8 D8D8 5000 0000 0000
+   196  type 51 sub  11  0040 D8D8 D8D8 D8D8 5000 0000 0000
+   197  type 51 sub  11  0041 D8D8 D8D8 D8D8 5000 0000 0000
+   198  type 51 sub  11  0042 D8D8 D8D8 D8D8 5000 0000 0000
+   199  type 51 sub  11  0043 D8D8 D8D8 D8D8 5000 0000 0000
+   200  type 51 sub  11  0044 D8D8 D8D8 D8D8 5000 0000 0000
+   201  type 51 sub  11  0045 D8D8 D8D8 D8D8 5000 0000 0000
+   202  type 51 sub  11  0046 D8D8 D8D8 D8D8 5000 0000 0000
+   203  type 51 sub  11  0047 D8D8 D8D8 D8D8 5000 0000 0000
+   204  type 51 sub  11  0048 D8D8 D8D8 D8D8 5000 0000 0000
+   205  type 51 sub  11  0049 D8D8 D8D8 D8D8 5000 0000 0000
+   206  type 51 sub  11  004A D8D8 D8D8 D8D8 5000 0000 0000
+   207  type 51 sub  11  004B D8D8 D8D8 D8D8 5000 0000 0000
+   208  type 51 sub  11  004C D8D8 D8D8 D8D8 5000 0000 0000
+   209  type 51 sub  11  004D D8D8 D8D8 D8D8 5000 0000 0000
+   210  type 51 sub  11  004E D8D8 D8D8 D8D8 5000 0000 0000
+   211  type 51 sub  11  004F D8D8 D8D8 D8D8 5000 0000 0000
+   212  type 51 sub  11  0050 D8D8 D8D8 D8D8 5000 0000 0000
+   213  type 51 sub  11  0051 D8D8 D8D8 D8D8 5000 0000 0000
+   214  type 51 sub  11  0052 D8D8 D8D8 D8D8 5000 0000 0000
+   215  type 51 sub  11  0053 D8D8 D8D8 D8D8 5000 0000 0000
+   216  type 51 sub  11  0054 D8D8 D8D8 D8D8 5000 0000 0000
+   217  type 51 sub  11  0055 D8D8 D8D8 D8D8 5000 0000 0000
+   218  type 51 sub  11  0056 D8D8 D8D8 D8D8 5000 0000 0000
+   219  type 51 sub  11  0057 D8D8 D8D8 D8D8 5000 0000 0000
+   220  type 51 sub  11  0058 D8D8 D8D8 D8D8 5000 0000 0000
+   221  type 51 sub  11  0059 D8D8 D8D8 D8D8 5000 0000 0000
+   222  type 51 sub  11  005A D8D8 D8D8 D8D8 5000 0000 0000
+   223  type 51 sub  11  005B D8D8 D8D8 D8D8 5000 0000 0000
+   224  type 51 sub  11  005C D8D8 D8D8 D8D8 5000 0000 0000
+   225  type 51 sub  11  005D D8D8 D8D8 D8D8 5000 0000 0000
+   226  type 51 sub  11  005E D8D8 D8D8 D8D8 5000 0000 0000
+   227  type 51 sub  11  005F D8D8 D8D8 D8D8 5000 0000 0000
+   228  type 51 sub  11  0060 D8D8 D8D8 D8D8 5000 0000 0000
+   229  type 51 sub  11  0061 D8D8 D8D8 D8D8 5000 0000 0000
+   230  type 51 sub  11  0062 D8D8 D8D8 D8D8 5000 0000 0000
+   231  type 51 sub  11  0063 D8D8 D8D8 D8D8 5000 0000 0000
+   232  type 51 sub  11  0064 D8D8 D8D8 D8D8 5000 0000 0000
+   233  type 51 sub  11  0065 D8D8 D8D8 D8D8 5000 0000 0000
+   234  type 51 sub  11  0066 D8D8 D8D8 D8D8 5000 0000 0000
+   235  type 51 sub  11  0067 D8D8 D8D8 D8D8 5000 0000 0000
+   236  type 51 sub  11  0068 D8D8 D8D8 D8D8 5000 0000 0000
+   237  type 51 sub  11  0069 D8D8 D8D8 D8D8 5000 0000 0000
+   238  type 51 sub  11  006A D8D8 D8D8 D8D8 5000 0000 0000
+   239  type 51 sub  11  006B D8D8 D8D8 D8D8 5000 0000 0000
+   240  type 51 sub  11  006C D8D8 D8D8 D8D8 5000 0000 0000
+   241  type 51 sub  11  006D D8D8 D8D8 D8D8 5000 0000 0000
+   242  type 51 sub  11  006E D8D8 D8D8 D8D8 5000 0000 0000
+   243  type 51 sub  11  006F D8D8 D8D8 D8D8 5000 0000 0000
+   244  type 51 sub  11  0070 D8D8 D8D8 D8D8 5000 0000 0000
+   245  type 51 sub  11  0071 D8D8 D8D8 D8D8 5000 0000 0000
+   246  type 51 sub  11  0072 D8D8 D8D8 D8D8 5000 0000 0000
+   247  type 51 sub  11  0073 D8D8 D8D8 D8D8 5000 0000 0000
+   248  type 51 sub  11  0074 D8D8 D8D8 D8D8 5000 0000 0000
+   249  type 51 sub  11  0075 D8D8 D8D8 D8D8 5000 0000 0000
+   250  type 51 sub  11  0076 D8D8 D8D8 D8D8 5000 0000 0000
+   251  type 51 sub  11  0077 D8D8 D8D8 D8D8 5000 0000 0000
+   252  type 01 sub  12  0000 1E28 0000 0000 0000 0000 0000
+   253  type 53 sub  12  0000 5F00 032E 0000 0000 0000 0000
+   254  type 51 sub  12  0000 D3DA DBD8 D3DC 500F 0016 0000
+   255  type 51 sub  12  0001 D9DE D3DE D7DC 5024 002B 0000
+   256  type 51 sub  12  0002 D9D1 DBD6 D2DD 5016 0012 0000
+   257  type 51 sub  12  0003 D6D4 D4DB D7DA 5017 0011 0000
+   258  type 51 sub  12  0004 DED7 DDD3 DED0 501A 0010 0000
+   259  type 51 sub  12  0005 D5DD D2DC DBDE 501B 000D 0000
+   260  type 51 sub  12  0006 D4D7 D0DC DED6 501D 000B 0000
+   261  type 51 sub  12  0007 D3DB DFD7 D3DB 5020 000A 0000
+   262  type 51 sub  12  0008 D7DA DBDF D7D3 5021 0008 0000
+   263  type 51 sub  12  0009 D6D9 D8DE D4D0 5022 0008 0000
+   264  type 51 sub  12  000A D3D0 DFD7 DADA 5023 0005 0000
+   265  type 51 sub  12  000B D5D2 DFDD DBDB 5023 0004 0000
+   266  type 51 sub  12  000C D1DE D7D5 D7D7 5024 0002 0000
+   267  type 51 sub  12  000D DCD5 DCDC D5DC 5022 0FFF 0000
+   268  type 51 sub  12  000E D3D5 DBD3 DDD9 5020 0FFC 0000
+   269  type 51 sub  12  000F D9DC DCD9 D0D4 501F 0FF9 0000
+   270  type 51 sub  12  0010 DAD9 D6DE DFDB 501D 0FF5 0000
+   271  type 51 sub  12  0011 D1DA D4D8 DED0 501E 0FF4 0000
+   272  type 51 sub  12  0012 DAD0 D3DF D1DD 501D 0FF1 0000
+   273  type 51 sub  12  0013 D0D3 D2DC D3DE 501E 0FF0 0000
+   274  type 51 sub  12  0014 D9DD D8D4 DBD6 501B 0FEF 0000
+   275  type 51 sub  12  0015 D6DC D1DB DADC 5017 0FEC 0000
+   276  type 51 sub  12  0016 D3DA DFD4 D6D0 5013 0FE9 0000
+   277  type 51 sub  12  0017 D2D7 DED5 DBD8 500F 0FE6 0000
+   278  type 51 sub  12  0018 D5D0 DADF DBD9 500A 0FE4 0000
+   279  type 51 sub  12  0019 D3D4 D4D2 D7D5 5008 0FE1 0000
+   280  type 51 sub  12  001A D1D1 D6D3 D0D6 5005 0FDF 0000
+   281  type 51 sub  12  001B D9D3 DFDF D7DF 5001 0FDC 0000
+   282  type 51 sub  12  001C DBD3 DFDB DFDF 5000 0FDC 0000
+   283  type 51 sub  12  001D D9D1 DCDC DEDC 5FFB 0FDC 0000
+   284  type 51 sub  12  001E DAD0 DDDF D6DC 5FF7 0FDC 0000
+   285  type 51 sub  12  001F DDDC D7DC D2D1 5FF4 0FDA 0000
+   286  type 51 sub  12  0020 D4D5 D9D3 DDDA 5FF1 0FDB 0000
+   287  type 51 sub  12  0021 D1DC D9DA DDDA 5FEF 0FDD 0000
+   288  type 51 sub  12  0022 D4D0 D2D5 D3D0 5FEC 0FDE 0000
+   289  type 51 sub  12  0023 DBD0 D9D8 D2D3 5FE8 0FE0 0000
+   290  type 51 sub  12  0024 D3DB D4D2 DDDC 5FE6 0FE3 0000
+   291  type 51 sub  12  0025 D2D3 D4D0 D9DD 5FE4 0FE5 0000
+   292  type 51 sub  12  0026 D7DA DBDF D6D3 5FE1 0FE7 0000
+   293  type 51 sub  12  0027 D7D9 DBDF D7D3 5FDE 0FE8 0000
+   294  type 51 sub  12  0028 DCD9 D6D8 D2DA 5FDC 0FEC 0000
+   295  type 51 sub  12  0029 D8DE DFD2 DDD3 5FDA 0FEF 0000
+   296  type 51 sub  12  002A DDDA DED8 DDDB 5FD8 0FF1 0000
+   297  type 51 sub  12  002B D8DB D3DE DCD9 5FD7 0FF4 0000
+   298  type 51 sub  12  002C D2D8 DDDB D2D4 5FD6 0FF8 0000
+   299  type 51 sub  12  002D DFD1 D4D5 D2D0 5FD9 0FFD 0000
+   300  type 51 sub  12  002E D2D6 D3D3 D1D1 5FDA 0001 0000
+   301  type 51 sub  12  002F DFD8 D9DF D1D1 5FDD 0006 0000
+   302  type 51 sub  12  0030 D0D8 D8D4 D4D8 5FE0 0008 0000
+   303  type 51 sub  12  0031 D8D5 DCD0 D5D8 5FE1 000E 0000
+   304  type 51 sub  12  0032 D7DD D6DB D4DA 5FE4 0011 0000
+   305  type 51 sub  12  0033 DBDE D8D6 D3DD 5FE6 0014 0000
+   306  type 51 sub  12  0034 D9D9 D0DE D6D9 5FEA 0015 0000
+   307  type 51 sub  12  0035 D2D1 D6D9 DBD0 5FEC 0015 0000
+   308  type 51 sub  12  0036 DCDA D2D7 D6D9 5FEE 0017 0000
+   309  type 51 sub  12  0037 D7DB DBD0 D7DC 5FEF 0018 0000
+   310  type 51 sub  12  0038 DDD2 DBD6 DFD8 5FF1 0019 0000
+   311  type 51 sub  12  0039 DADD D4DD D8D3 5FF2 001A 0000
+   312  type 51 sub  12  003A D3D3 DAD1 D5DF 5FF5 001A 0000
+   313  type 51 sub  12  003B D8DB D7DE D0D4 5FF8 001B 0000
+   314  type 51 sub  12  003C DCD8 D6DE D1D3 5FFA 001C 0000
+   315  type 51 sub  12  003D D8DB D6DE D2D6 5FFA 0038 0000
+   316  type 51 sub  12  003E DBD9 DDDF D1D5 5FFF 001C 0000
+   317  type 51 sub  12  003F DDDB D5DD D9D1 5001 001C 0000
+   318  type 51 sub  12  0040 DFDC D2D6 D8D2 5002 001B 0000
+   319  type 51 sub  12  0041 D7DE D2D7 D9D8 5007 001C 0000
+   320  type 51 sub  12  0042 D4DE D2D3 D9D8 5008 001C 0000
+   321  type 51 sub  12  0043 DFDB D0D6 DAD3 500B 001D 0000
+   322  type 51 sub  12  0044 DFD8 D5DE D1D2 500E 001C 0000
+   323  type 51 sub  12  0045 D8D0 DCDF D0D7 5010 001D 0000
+   324  type 51 sub  12  0046 D8D8 DCDF D0D7 5010 001B 0000
+   325  type 51 sub  12  0047 D9DF D5DE DBD2 5012 001B 0000
+   326  type 51 sub  12  0048 D2D4 DED9 DAD1 5012 0017 0000
+   327  type 51 sub  12  0049 D8D2 D5DE DBD0 5013 0017 0000
+   328  type 51 sub  12  004A DCD6 D9D2 D3D6 5014 0015 0000
+   329  type 51 sub  12  004B DCD0 D9D2 DBD4 5015 0013 0000
+   330  type 51 sub  12  004C D5D9 DFD0 DAD1 5015 0013 0000
+   331  type 51 sub  12  004D D2D4 D0DF D3DA 5017 0012 0000
+   332  type 51 sub  12  004E D6D4 D4D9 D7DA 5018 0010 0000
+   333  type 51 sub  12  004F D2DA D1DB D0DD 501B 000E 0000
+   334  type 51 sub  12  0050 DBD1 DCD1 D6DA 501A 000D 0000
+   335  type 51 sub  12  0051 D8D8 DED2 D1DB 501B 000B 0000
+   336  type 51 sub  12  0052 DED7 D1DB DADC 501A 000A 0000
+   337  type 51 sub  12  0053 D9D3 D4D0 DADE 501C 0007 0000
+   338  type 51 sub  12  0054 DBD8 D1D9 DCD5 501E 0006 0000
+   339  type 51 sub  12  0055 D6D7 DADE D3DB 501E 0006 0000
+   340  type 51 sub  12  0056 D9DC D1D9 D4D0 501E 0005 0000
+   341  type 51 sub  12  0057 D8DC D0D0 D4D0 5020 0004 0000
+   342  type 51 sub  12  0058 DDD3 D9D9 D9D9 5022 0002 0000
+   343  type 51 sub  12  0059 D3D2 D3D3 D2D3 5021 0000 0000
+   344  type 51 sub  12  005A D0DB D1D1 D1D1 5023 0FFF 0000
+   345  type 51 sub  12  005B DAD5 DEDA DCDC 5023 0FFE 0000
+   346  type 51 sub  12  005C D1D6 DBDB DFDB 5022 0FFB 0000
+   347  type 51 sub  12  005D DADA DEDA D2D6 5020 0FFB 0000
+   348  type 51 sub  12  005E D6DB DBD2 D7DF 501F 0FF8 0000
+   349  type 51 sub  12  005F D1D0 DDD9 D8D0 501E 0FF5 0000
+   350  type 51 sub  12  0060 D6DD DEDA DFD3 501D 0FF2 0000
+   351  type 51 sub  12  0061 D9DB D8D0 DAD6 501D 0FF1 0000
+   352  type 51 sub  12  0062 DDD3 DCD0 D6DA 501C 0FED 0000
+   353  type 51 sub  12  0063 D9D3 DCD5 D6D2 501C 0FEC 0000
+   354  type 51 sub  12  0064 DDDC D6D0 D9DF 501A 0FEA 0000
+   355  type 51 sub  12  0065 DBDE DCD5 D1DB 5017 0FE8 0000
+   356  type 51 sub  12  0066 D8D9 D0D3 DDD6 5012 0FE5 0000
+   357  type 51 sub  12  0067 D1DA DDD6 D8DE 500E 0FE4 0000
+   358  type 51 sub  12  0068 D3DF D5D0 DCDE 500B 0FE3 0000
+   359  type 51 sub  12  0069 DCDB DBD9 D8DA 5008 0FE1 0000
+   360  type 51 sub  12  006A DED7 DCDC DDDD 5004 0FDE 0000
+   361  type 51 sub  12  006B D3DA D2D2 DADA 5001 0FDE 0000
+   362  type 51 sub  12  006C DED6 DEDE DEDE 5000 0FDE 0000
+   363  type 51 sub  12  006D D3D8 D3D3 D9D9 5FFD 0FDD 0000
+   364  type 51 sub  12  006E DED6 DFDF DCDD 5FFB 0FDF 0000
+   365  type 51 sub  12  006F D5D7 D6D4 D4D7 5FF7 0FE0 0000
+   366  type 51 sub  12  0070 D2D7 D4D3 D5D6 5FF4 0FE1 0000
+   367  type 51 sub  12  0071 D7DE D6D4 DED5 5FF1 0FE1 0000
+   368  type 51 sub  12  0072 D6DB DEDD DFDC 5FEF 0FE2 0000
+   369  type 51 sub  12  0073 D9D7 D8DB D2D3 5FEC 0FE2 0000
+   370  type 51 sub  12  0074 DCD1 DFDD D8DA 5FE7 0FE3 0000
+   371  type 51 sub  12  0075 D3D8 D6D6 D8DC 5FE3 0FE3 0000
+   372  type 51 sub  12  0076 D0D8 D5D1 DDDD 5FE0 0FE4 0000
+   373  type 51 sub  12  0077 D0D7 DED0 DADA 5FDE 0FE6 0000
+   374  type 01 sub  13  0000 24B5 0000 0000 0000 0000 0000
+   375  type 53 sub  13  0000 4000 017D 0000 0000 0000 0000
+   376  type 51 sub  13  0000 CDCD CDCD CDCD 4000 0000 0000
+   377  type 51 sub  13  0001 CDCD CDCD CDCD 4000 0000 0000
+   378  type 51 sub  13  0002 CDCD CDCD CDCD 4000 0000 0000
+   379  type 51 sub  13  0003 CDCD CDCD CDCD 4000 0000 0000
+   380  type 51 sub  13  0004 CDCD CDCD CDCD 4000 0000 0000
+   381  type 51 sub  13  0005 CDCD CDCD CDCD 4000 0000 0000
+   382  type 51 sub  13  0006 CDCD CDCD CDCD 4000 0000 0000
+   383  type 51 sub  13  0007 CDCD CDCD CDCD 4000 0000 0000
+   384  type 51 sub  13  0008 CDCD CDCD CDCD 4000 0000 0000
+   385  type 51 sub  13  0009 CDCD CDCD CDCD 4000 0000 0000
+   386  type 51 sub  13  000A CDCD CDCD CDCD 4000 0000 0000
+   387  type 51 sub  13  000B CDCD CDCD CDCD 4000 0000 0000
+   388  type 51 sub  13  000C CDCD CDCD CDCD 4000 0000 0000
+   389  type 51 sub  13  000D CDCD CDCD CDCD 4000 0000 0000
+   390  type 51 sub  13  000E CDCD CDCD CDCD 4000 0000 0000
+   391  type 51 sub  13  000F CDCD CDCD CDCD 4000 0000 0000
+   392  type 51 sub  13  0010 CDCD CDCD CDCD 4000 0000 0000
+   393  type 51 sub  13  0011 CDCD CDCD CDCD 4000 0000 0000
+   394  type 51 sub  13  0012 CDCD CDCD CDCD 4000 0000 0000
+   395  type 51 sub  13  0013 CDCD CDCD CDCD 4000 0000 0000
+   396  type 51 sub  13  0014 CDCD CDCD CDCD 4000 0000 0000
+   397  type 51 sub  13  0015 CDCD CDCD CDCD 4000 0000 0000
+   398  type 51 sub  13  0016 CDCD CDCD CDCD 4000 0000 0000
+   399  type 51 sub  13  0017 CDCD CDCD CDCD 4000 0000 0000
+   400  type 51 sub  13  0018 CDCD CDCD CDCD 4000 0000 0000
+   401  type 51 sub  13  0019 CDCD CDCD CDCD 4000 0000 0000
+   402  type 51 sub  13  001A CDCD CDCD CDCD 4000 0000 0000
+   403  type 51 sub  13  001B CDCD CDCD CDCD 4000 0000 0000
+   404  type 51 sub  13  001C CDCD CDCD CDCD 4000 0000 0000
+   405  type 51 sub  13  001D CDCD CDCD CDCD 4000 0000 0000
+   406  type 51 sub  13  001E CDCD CDCD CDCD 4000 0000 0000
+   407  type 51 sub  13  001F CDCD CDCD CDCD 4000 0000 0000
+   408  type 51 sub  13  0020 CDCD CDCD CDCD 4000 0000 0000
+   409  type 51 sub  13  0021 CDCD CDCD CDCD 4000 0000 0000
+   410  type 51 sub  13  0022 CDCD CDCD CDCD 4000 0000 0000
+   411  type 51 sub  13  0023 CDCD CDCD CDCD 4000 0000 0000
+   412  type 51 sub  13  0024 CDCD CDCD CDCD 4000 0000 0000
+   413  type 51 sub  13  0025 CDCD CDCD CDCD 4000 0000 0000
+   414  type 51 sub  13  0026 CDCD CDCD CDCD 4000 0000 0000
+   415  type 51 sub  13  0027 CDCD CDCD CDCD 4000 0000 0000
+   416  type 51 sub  13  0028 CDCD CDCD CDCD 4000 0000 0000
+   417  type 51 sub  13  0029 CDCD CDCD CDCD 4000 0000 0000
+   418  type 51 sub  13  002A CDCD CDCD CDCD 4000 0000 0000
+   419  type 51 sub  13  002B CDCD CDCD CDCD 4000 0000 0000
+   420  type 51 sub  13  002C CDCD CDCD CDCD 4000 0000 0000
+   421  type 51 sub  13  002D CDCD CDCD CDCD 4000 0000 0000
+   422  type 51 sub  13  002E CDCD CDCD CDCD 4000 0000 0000
+   423  type 51 sub  13  002F CDCD CDCD CDCD 4000 0000 0000
+   424  type 51 sub  13  0030 CDCD CDCD CDCD 4000 0000 0000
+   425  type 51 sub  13  0031 CDCD CDCD CDCD 4000 0000 0000
+   426  type 51 sub  13  0032 CDCD CDCD CDCD 4000 0000 0000
+   427  type 51 sub  13  0033 CDCD CDCD CDCD 4000 0000 0000
+   428  type 51 sub  13  0034 CDCD CDCD CDCD 4000 0000 0000
+   429  type 51 sub  13  0035 CDCD CDCD CDCD 4000 0000 0000
+   430  type 51 sub  13  0036 CDCD CDCD CDCD 4000 0000 0000
+   431  type 51 sub  13  0037 CDCD CDCD CDCD 4000 0000 0000
+   432  type 51 sub  13  0038 CDCD CDCD CDCD 4000 0000 0000
+   433  type 51 sub  13  0039 CDCD CDCD CDCD 4000 0000 0000
+   434  type 51 sub  13  003A CDCD CDCD CDCD 4000 0000 0000
+   435  type 51 sub  13  003B CDCD CDCD CDCD 4000 0000 0000
+   436  type 01 sub  14  0000 275D 0000 0000 0000 0000 0000
+   437  type 53 sub  14  0000 1000 0000 0000 0000 0000 0000
+   438  type 51 sub  14  0000 9C9C 9C9C 9C9C 1000 0000 0000
+   439  type 51 sub  14  0001 9C9C 9C9C 9C9C 1000 0000 0000
+   440  type 51 sub  14  0002 9C9C 9C9C 9C9C 1000 0000 0000
+   441  type 51 sub  14  0003 9C9C 9C9C 9C9C 1000 0000 0000
+   442  type 51 sub  14  0004 9C9C 9C9C 9C9C 1000 0000 0000
+   443  type 51 sub  14  0005 9C9C 9C9C 9C9C 1000 0000 0000
+   444  type 51 sub  14  0006 9C9C 9C9C 9C9C 1000 0000 0000
+   445  type 51 sub  14  0007 9C9C 9C9C 9C9C 1000 0000 0000
+   446  type 51 sub  14  0008 9C9C 9C9C 9C9C 1000 0000 0000
+   447  type 51 sub  14  0009 9C9C 9C9C 9C9C 1000 0000 0000
+   448  type 51 sub  14  000A 9C9C 9C9C 9C9C 1000 0000 0000
+   449  type 51 sub  14  000B 9C9C 9C9C 9C9C 1000 0000 0000
+   450  type 51 sub  14  000C 9C9C 9C9C 9C9C 1000 0000 0000
+   451  type 51 sub  14  000D 9C9C 9C9C 9C9C 1000 0000 0000
+   452  type 51 sub  14  000E 9C9C 9C9C 9C9C 1000 0000 0000
+   453  type 51 sub  14  000F 9C9C 9C9C 9C9C 1000 0000 0000
+   454  type 51 sub  14  0010 9C9C 9C9C 9C9C 1000 0000 0000
+   455  type 51 sub  14  0011 9C9C 9C9C 9C9C 1000 0000 0000
+   456  type 51 sub  14  0012 9C9C 9C9C 9C9C 1000 0000 0000
+   457  type 51 sub  14  0013 9C9C 9C9C 9C9C 1000 0000 0000
+   458  type 51 sub  14  0014 9C9C 9C9C 9C9C 1000 0000 0000
+   459  type 51 sub  14  0015 9C9C 9C9C 9C9C 1000 0000 0000
+   460  type 51 sub  14  0016 9C9C 9C9C 9C9C 1000 0000 0000
+   461  type 51 sub  14  0017 9C9C 9C9C 9C9C 1000 0000 0000
+   462  type 51 sub  14  0018 9C9C 9C9C 9C9C 1000 0000 0000
+   463  type 51 sub  14  0019 9C9C 9C9C 9C9C 1000 0000 0000
+   464  type 51 sub  14  001A 9C9C 9C9C 9C9C 1000 0000 0000
+   465  type 51 sub  14  001B 9C9C 9C9C 9C9C 1000 0000 0000
+   466  type 51 sub  14  001C 9C9C 9C9C 9C9C 1000 0000 0000
+   467  type 51 sub  14  001D 9C9C 9C9C 9C9C 1000 0000 0000
+   468  type 51 sub  14  001E 9C9C 9C9C 9C9C 1000 0000 0000
+   469  type 51 sub  14  001F 9C9C 9C9C 9C9C 1000 0000 0000
+   470  type 51 sub  14  0020 9C9C 9C9C 9C9C 1000 0000 0000
+   471  type 51 sub  14  0021 9C9C 9C9C 9C9C 1000 0000 0000
+   472  type 51 sub  14  0022 9C9C 9C9C 9C9C 1000 0000 0000
+   473  type 51 sub  14  0023 9C9C 9C9C 9C9C 1000 0000 0000
+   474  type 51 sub  14  0024 9C9C 9C9C 9C9C 1000 0000 0000
+   475  type 51 sub  14  0025 9C9C 9C9C 9C9C 1000 0000 0000
+   476  type 51 sub  14  0026 9C9C 9C9C 9C9C 1000 0000 0000
+   477  type 51 sub  14  0027 9C9C 9C9C 9C9C 1000 0000 0000
+   478  type 51 sub  14  0028 9C9C 9C9C 9C9C 1000 0000 0000
+   479  type 51 sub  14  0029 9C9C 9C9C 9C9C 1000 0000 0000
+   480  type 51 sub  14  002A 9C9C 9C9C 9C9C 1000 0000 0000
+   481  type 51 sub  14  002B 9C9C 9C9C 9C9C 1000 0000 0000
+   482  type 51 sub  14  002C 9C9C 9C9C 9C9C 1000 0000 0000
+   483  type 51 sub  14  002D 9C9C 9C9C 9C9C 1000 0000 0000
+   484  type 51 sub  14  002E 9C9C 9C9C 9C9C 1000 0000 0000
+   485  type 51 sub  14  002F 9C9C 9C9C 9C9C 1000 0000 0000
+   486  type 51 sub  14  0030 9C9C 9C9C 9C9C 1000 0000 0000
+   487  type 51 sub  14  0031 9C9C 9C9C 9C9C 1000 0000 0000
+   488  type 51 sub  14  0032 9C9C 9C9C 9C9C 1000 0000 0000
+   489  type 51 sub  14  0033 9C9C 9C9C 9C9C 1000 0000 0000
+   490  type 51 sub  14  0034 9C9C 9C9C 9C9C 1000 0000 0000
+   491  type 51 sub  14  0035 9C9C 9C9C 9C9C 1000 0000 0000
+   492  type 51 sub  14  0036 9C9C 9C9C 9C9C 1000 0000 0000
+   493  type 51 sub  14  0037 9C9C 9C9C 9C9C 1000 0000 0000
+   494  type 51 sub  14  0038 9C9C 9C9C 9C9C 1000 0000 0000
+   495  type 51 sub  14  0039 9C9C 9C9C 9C9C 1000 0000 0000
+   496  type 51 sub  14  003A 9C9C 9C9C 9C9C 1000 0000 0000
+   497  type 51 sub  14  003B 9C9C 9C9C 9C9C 1000 0000 0000
+   498  type 01 sub  15  0000 2954 0000 0000 0000 0000 0000
+   499  type 53 sub  15  0000 0000 0000 0000 0000 0000 0000
+   500  type 51 sub  15  0000 8C8C 8C8C 8C8C 0000 0000 0000
+   501  type 51 sub  15  0001 8C8C 8C8C 8C8C 0000 0000 0000
+   502  type 51 sub  15  0002 8C8C 8C8C 8C8C 0000 0000 0000
+   503  type 51 sub  15  0003 8C8C 8C8C 8C8C 0000 0000 0000
+   504  type 51 sub  15  0004 8C8C 8C8C 8C8C 0000 0000 0000
+   505  type 51 sub  15  0005 8C8C 8C8C 8C8C 0000 0000 0000
+   506  type 51 sub  15  0006 8C8C 8C8C 8C8C 0000 0000 0000
+   507  type 51 sub  15  0007 8C8C 8C8C 8C8C 0000 0000 0000
+   508  type 51 sub  15  0008 8C8C 8C8C 8C8C 0000 0000 0000
+   509  type 51 sub  15  0009 8C8C 8C8C 8C8C 0000 0000 0000
+   510  type 51 sub  15  000A 8C8C 8C8C 8C8C 0000 0000 0000
+   511  type 51 sub  15  000B 8C8C 8C8C 8C8C 0000 0000 0000
+   512  type 51 sub  15  000C 8C8C 8C8C 8C8C 0000 0000 0000
+   513  type 51 sub  15  000D 8C8C 8C8C 8C8C 0000 0000 0000
+   514  type 51 sub  15  000E 8C8C 8C8C 8C8C 0000 0000 0000
+   515  type 51 sub  15  000F 8C8C 8C8C 8C8C 0000 0000 0000
+   516  type 51 sub  15  0010 8C8C 8C8C 8C8C 0000 0000 0000
+   517  type 51 sub  15  0011 8C8C 8C8C 8C8C 0000 0000 0000
+   518  type 51 sub  15  0012 8C8C 8C8C 8C8C 0000 0000 0000
+   519  type 51 sub  15  0013 8C8C 8C8C 8C8C 0000 0000 0000
+   520  type 51 sub  15  0014 8C8C 8C8C 8C8C 0000 0000 0000
+   521  type 51 sub  15  0015 8C8C 8C8C 8C8C 0000 0000 0000
+   522  type 51 sub  15  0016 8C8C 8C8C 8C8C 0000 0000 0000
+   523  type 51 sub  15  0017 8C8C 8C8C 8C8C 0000 0000 0000
+   524  type 51 sub  15  0018 8C8C 8C8C 8C8C 0000 0000 0000
+   525  type 51 sub  15  0019 8C8C 8C8C 8C8C 0000 0000 0000
+   526  type 51 sub  15  001A 8C8C 8C8C 8C8C 0000 0000 0000
+   527  type 51 sub  15  001B 8C8C 8C8C 8C8C 0000 0000 0000
+   528  type 51 sub  15  001C 8C8C 8C8C 8C8C 0000 0000 0000
+   529  type 51 sub  15  001D 8C8C 8C8C 8C8C 0000 0000 0000
+   530  type 51 sub  15  001E 8C8C 8C8C 8C8C 0000 0000 0000
+   531  type 51 sub  15  001F 8C8C 8C8C 8C8C 0000 0000 0000
+   532  type 51 sub  15  0020 8C8C 8C8C 8C8C 0000 0000 0000
+   533  type 51 sub  15  0021 8C8C 8C8C 8C8C 0000 0000 0000
+   534  type 51 sub  15  0022 8C8C 8C8C 8C8C 0000 0000 0000
+   535  type 51 sub  15  0023 8C8C 8C8C 8C8C 0000 0000 0000
+   536  type 51 sub  15  0024 8C8C 8C8C 8C8C 0000 0000 0000
+   537  type 51 sub  15  0025 8C8C 8C8C 8C8C 0000 0000 0000
+   538  type 51 sub  15  0026 8C8C 8C8C 8C8C 0000 0000 0000
+   539  type 51 sub  15  0027 8C8C 8C8C 8C8C 0000 0000 0000
+   540  type 51 sub  15  0028 8C8C 8C8C 8C8C 0000 0000 0000
+   541  type 51 sub  15  0029 8C8C 8C8C 8C8C 0000 0000 0000
+   542  type 51 sub  15  002A 8C8C 8C8C 8C8C 0000 0000 0000
+   543  type 51 sub  15  002B 8C8C 8C8C 8C8C 0000 0000 0000
+   544  type 51 sub  15  002C 8C8C 8C8C 8C8C 0000 0000 0000
+   545  type 51 sub  15  002D 8C8C 8C8C 8C8C 0000 0000 0000
+   546  type 51 sub  15  002E 8C8C 8C8C 8C8C 0000 0000 0000
+   547  type 51 sub  15  002F 8C8C 8C8C 8C8C 0000 0000 0000
+   548  type 51 sub  15  0030 8C8C 8C8C 8C8C 0000 0000 0000
+   549  type 51 sub  15  0031 8C8C 8C8C 8C8C 0000 0000 0000
+   550  type 51 sub  15  0032 8C8C 8C8C 8C8C 0000 0000 0000
+   551  type 51 sub  15  0033 8C8C 8C8C 8C8C 0000 0000 0000
+   552  type 51 sub  15  0034 8C8C 8C8C 8C8C 0000 0000 0000
+   553  type 51 sub  15  0035 8C8C 8C8C 8C8C 0000 0000 0000
+   554  type 51 sub  15  0036 8C8C 8C8C 8C8C 0000 0000 0000
+   555  type 51 sub  15  0037 8C8C 8C8C 8C8C 0000 0000 0000
+   556  type 51 sub  15  0038 8C8C 8C8C 8C8C 0000 0000 0000
+   557  type 51 sub  15  0039 8C8C 8C8C 8C8C 0000 0000 0000
+   558  type 51 sub  15  003A 8C8C 8C8C 8C8C 0000 0000 0000
+   559  type 51 sub  15  003B 8C8C 8C8C 8C8C 0000 0000 0000
+   560  type 01 sub  16  0000 2B02 0000 0000 0000 0000 0000
+   561  type 53 sub  16  0000 5007 0020 0000 0000 0000 0000
+   562  type 52 sub  16  0000 5000 0000 5000 0000 5000 0000
+   563  type 52 sub  16  0003 5000 0000 5000 0000 5000 0000
+   564  type 52 sub  16  0006 5000 0000 5000 0000 5000 0000
+   565  type 52 sub  16  0009 5000 0000 5FFF 0000 5000 0000
+   566  type 52 sub  16  000C 5FFF 0000 5FFD 0FFF 5FFE 0FFE
+   567  type 52 sub  16  000F 5FFD 0FFF 5FFF 0FFF 5FFE 0FFF
+   568  type 52 sub  16  0012 5FFF 0FFF 5000 0000 5001 0000
+   569  type 52 sub  16  0015 5003 0FFE 5010 0FFA 5027 0FF9
+   570  type 52 sub  16  0018 503C 0FFE 5040 0005 5027 0011
+   571  type 52 sub  16  001B 500A 001D 503D 0022 5080 001F
+   572  type 52 sub  16  001E 5063 0018 5048 0007 5029 000E
+   573  type 52 sub  16  0021 5000 0000 5000 0000 5000 0000
+   574  type 52 sub  16  0024 5000 0000 5000 0FFF 5000 0001
+   575  type 52 sub  16  0027 5000 0000 5000 0000 5000 0000
+   576  type 52 sub  16  002A 5FFE 0000 5000 0000 5000 0FF5
+   577  type 52 sub  16  002D 5FFA 000B 5013 0004 501A 0FFB
+   578  type 52 sub  16  0030 500A 0FFC 5000 0005 5000 000E
+   579  type 52 sub  16  0033 5000 001A 5000 0029 5075 0029
+   580  type 52 sub  16  0036 50AA 0025 5079 001A 500A 0002
+   581  type 52 sub  16  0039 5000 0000 5000 0000 5000 0000
+   582  type 52 sub  16  003C 5000 0000 5FFF 0000 5FFF 0FFA
+   583  type 52 sub  16  003F 5F84 000D 5F93 0008 5FB1 0FFE
+   584  type 52 sub  16  0042 5FCA 0FF3 5FDE 0FF2 5FEE 0FF6
+   585  type 52 sub  16  0045 5FFC 0004 5000 0018 5005 0023
+   586  type 52 sub  16  0048 50DA 0024 50AD 001C 5032 0008
+   587  type 52 sub  16  004B 5000 0000 5000 0000 5000 0000
+   588  type 52 sub  16  004E 5000 0000 5FFF 0000 5000 0000
+   589  type 52 sub  16  0051 5000 0000 5FFF 0000 5FFF 0000
+   590  type 52 sub  16  0054 5000 0001 5000 0000 5001 0FF8
+   591  type 52 sub  16  0057 5000 000E 5000 0002 5000 0FF3
+   592  type 52 sub  16  005A 5000 0FF7 5000 000B 5000 0010
+   593  type 52 sub  16  005D 5000 0012 5000 0013 5055 001B
+   594  type 52 sub  16  0060 50E3 001C 50D4 001B 508F 000C
+   595  type 52 sub  16  0063 500C 0FFC 5000 0000 5FFF 0FFF
+   596  type 52 sub  16  0066 5000 0000 5000 0000 5000 0000
+   597  type 52 sub  16  0069 5000 0000 5FFF 0001 5FFE 0001
+   598  type 52 sub  16  006C 5001 0005 5F9D 0013 5FAF 0008
+   599  type 52 sub  16  006F 5FD5 0FFE 5FED 0FF0 5000 0FF6
+   600  type 52 sub  16  0072 5000 0FFE 5000 0010 5000 0019
+   601  type 52 sub  16  0075 5000 001B 5035 0022 5096 0011
+   602  type 52 sub  16  0078 5017 0FFE 5001 0000 5FFF 0000
+   603  type 52 sub  16  007B 5000 0000 5000 0000 5000 0000
+   604  type 52 sub  16  007E 5000 0000 5000 0000 5FFE 0000
+   605  type 52 sub  16  0081 5000 0001 5000 0006 5000 0FF6
+   606  type 52 sub  16  0084 5FFF 0006 5000 0FE7 5000 0FF4
+   607  type 52 sub  16  0087 5000 0FF7 5000 0FFC 5000 0FFA
+   608  type 52 sub  16  008A 5000 0FFF 5002 0008 50FE 0013
+   609  type 52 sub  16  008D 50DD 0017 508E 000E 500F 0000
+   610  type 52 sub  16  0090 5000 0000 5000 0000 5000 0FFF
+   611  type 52 sub  16  0093 5000 0001 5000 0000 5FFF 0FFF
+   612  type 52 sub  16  0096 5000 0001 5FFE 0001 5000 0000
+   613  type 52 sub  16  0099 5000 0FFC 5FBC 0015 5FDA 0009
+   614  type 52 sub  16  009C 5009 0FFA 5007 0FEF 5000 0FE9
+   615  type 52 sub  16  009F 5000 0FEA 5000 0FF1 5000 0FF8
+   616  type 52 sub  16  00A2 5000 0006 5000 0016 5000 001E
+   617  type 52 sub  16  00A5 50CA 001E 50C6 001F 507A 000D
+   618  type 52 sub  16  00A8 5009 0FFF 5000 0000 5000 0000
+   619  type 52 sub  16  00AB 5000 0000 5000 0000 5FFF 0000
+   620  type 52 sub  16  00AE 5000 0000 5000 0000 5000 0000
+   621  type 52 sub  16  00B1 5FFE 0000 5000 0001 5000 0000
+   622  type 54 sub  16  0000 1164 0000 058A 0B0E 0306 007F
+   623  type 01 sub  17  0000 2FA3 0000 0000 0000 0000 0000
+   624  type 53 sub  17  0000 5FFF 0009 0000 0000 0000 0000
+   625  type 53 sub  17  003C 524F 00EB 003C 0000 0000 0000
+   626  type 53 sub  17  0078 563E 00A3 003C 0000 0000 0000
+   627  type 53 sub  17  00B4 54B0 0019 003C 0000 0000 0000
+   628  type 53 sub  17  00F0 5633 000E 003C 0000 0000 0000
+   629  type 53 sub  17  012C 57AB 002B 003C 0000 0000 0000
+   630  type 01 sub  18  0000 33BA 0000 0000 0000 0000 0000
+   631  type 53 sub  18  0000 5000 002A 0000 0000 0000 0000
+   632  type 52 sub  18  0000 5000 0000 5000 0000 5000 0000
+   633  type 52 sub  18  0003 5000 0000 5000 0000 5000 0000
+   634  type 52 sub  18  0006 5000 0000 5000 0000 5000 0000
+   635  type 52 sub  18  0009 5000 0000 5000 0000 5000 0000
+   636  type 52 sub  18  000C 5FFF 0FFF 5FFB 0000 5FF0 0FFF
+   637  type 52 sub  18  000F 5FD8 0FFF 5FB4 0FFB 5F91 0FF6
+   638  type 52 sub  18  0012 5F74 0FF5 5F5C 0FF8 5F48 0FF4
+   639  type 52 sub  18  0015 5F46 0FF0 5F60 0FF1 5F84 0FF5
+   640  type 52 sub  18  0018 5FAD 0FFC 5FD7 0002 5FF0 0FFF
+   641  type 52 sub  18  001B 5000 0FFF 5000 0000 5000 0001
+   642  type 52 sub  18  001E 5000 0000 5000 0000 5000 0000
+   643  type 52 sub  18  0021 5000 0000 5001 0000 5001 0000
+   644  type 52 sub  18  0024 5000 0000 5000 0000 5000 0000
+   645  type 52 sub  18  0027 5000 0000 5000 0000 5000 0FFF
+   646  type 52 sub  18  002A 5FF3 0FF2 5FFA 0005 5FDC 0FF3
+   647  type 52 sub  18  002D 5FA6 0FE3 5F6C 0FDE 5F35 0FDB
+   648  type 52 sub  18  0030 5F0E 0FD9 5F04 0FD9 5F07 0FE7
+   649  type 52 sub  18  0033 5F1F 0FF2 5F57 0FFA 5F8F 0FFA
+   650  type 52 sub  18  0036 5FB0 0FFF 5FDF 0001 5FFD 0000
+   651  type 52 sub  18  0039 5000 0000 5000 0000 5000 0001
+   652  type 52 sub  18  003C 5000 0000 5000 0000 5000 0000
+   653  type 52 sub  18  003F 500D 0FF7 5020 0006 5015 000B
+   654  type 52 sub  18  0042 5FD3 0FE8 5F9A 0FE5 5F84 0FEE
+   655  type 52 sub  18  0045 5F6E 0FF3 5F4B 0FF1 5F36 0FF0
+   656  type 52 sub  18  0048 5F38 0FF2 5F3F 0FF1 5F57 0FF4
+   657  type 52 sub  18  004B 5F84 0FF2 5FAF 0FF4 5FDE 0001
+   658  type 52 sub  18  004E 5FFE 0000 5000 0000 5000 0000
+   659  type 52 sub  18  0051 5000 0000 5000 0000 5000 0000
+   660  type 52 sub  18  0054 5000 0000 5001 0000 5000 0000
+   661  type 52 sub  18  0057 5000 0000 5004 0FFA 5010 0001
+   662  type 52 sub  18  005A 5FFB 0FF9 5FDB 0FEB 5FA8 0FE6
+   663  type 52 sub  18  005D 5F84 0FF0 5F5B 0FF5 5F2C 0FF4
+   664  type 52 sub  18  0060 5F09 0FEF 5EFF 0FF8 5F09 0FEE
+   665  type 52 sub  18  0063 5F2B 0FF2 5F62 0FFB 5F88 0FFB
+   666  type 52 sub  18  0066 5FA8 0002 5FC3 0000 5FF3 0000
+   667  type 52 sub  18  0069 5000 0000 5000 0000 5000 0000
+   668  type 52 sub  18  006C 5000 0000 5000 0000 5000 0000
+   669  type 52 sub  18  006F 5000 0000 5000 0000 5000 0000
+   670  type 52 sub  18  0072 5004 0FFE 502C 0003 5036 0002
+   671  type 52 sub  18  0075 5009 0FF7 5FE4 0FE6 5FB0 0FE8
+   672  type 52 sub  18  0078 5F6F 0FEA 5E72 0FE5 5EF9 0FF2
+   673  type 52 sub  18  007B 5EE5 0FF0 5EE8 0FF7 5EED 0FF9
+   674  type 52 sub  18  007E 5F07 0FF8 5F31 0FF6 5F6C 0FFC
+   675  type 52 sub  18  0081 5F9F 0FFE 5FC1 0001 5FE8 0000
+   676  type 52 sub  18  0084 5FFE 0000 5000 0000 5000 0000
+   677  type 52 sub  18  0087 5000 0000 5000 0000 5000 0000
+   678  type 52 sub  18  008A 5000 0000 5000 0000 5003 0FFD
+   679  type 52 sub  18  008D 501F 0FFD 5043 0011 5FF8 0FF6
+   680  type 52 sub  18  0090 5FB0 0FD5 5F6C 0FD2 5F50 0FDC
+   681  type 52 sub  18  0093 5F2A 0FE5 5EF8 0FEA 5ED4 0FE8
+   682  type 52 sub  18  0096 5ECB 0FF1 5EDA 0FF3 5F01 0FFB
+   683  type 52 sub  18  0099 5F34 0FF8 5F67 000D 5F93 0FFD
+   684  type 52 sub  18  009C 5FBF 0000 5FE2 0001 5FF9 0000
+   685  type 52 sub  18  009F 5000 0000 5000 0000 5000 0000
+   686  type 52 sub  18  00A2 5000 0000 5000 0000 5001 0000
+   687  type 52 sub  18  00A5 5000 0000 5000 0000 5003 0003
+   688  type 52 sub  18  00A8 503A 0015 5016 0008 5FC4 0FE2
+   689  type 52 sub  18  00AB 5F68 0FD8 5F38 0FEA 5F16 0FF4
+   690  type 52 sub  18  00AE 5EEE 0FF9 5ED9 0FFD 5EDF 0FFB
+   691  type 52 sub  18  00B1 5EFF 0FFA 5F32 0FFE 5F70 0FF3
+   692  type 54 sub  18  0000 38A5 0000 056C CA5D FB5C 007A
+   693  type 01 sub  19  0000 3612 0000 0000 0000 0000 0000
+   694  type 53 sub  19  0000 5000 0F2E 0000 0000 0000 0000
+   695  type 53 sub  19  003C 5826 0F07 003C 0000 0000 0000
+   696  type 53 sub  19  0078 5800 0E60 003C 0000 0000 0000
+   697  type 53 sub  19  00B4 5800 0F14 003C 0000 0000 0000
+   698  type 53 sub  19  00F0 5800 0EA3 003C 0000 0000 0000
+   699  type 53 sub  19  012C 5800 0ECA 003C 0000 0000 0000
+   700  type 01 sub  20  0000 38AA 0000 0000 0000 0000 0000
+   701  type 53 sub  20  0000 5000 0FF8 0000 0000 0000 0000
+   702  type 52 sub  20  0000 5000 0000 5000 0000 5000 0000
+   703  type 52 sub  20  0003 5000 0000 5000 0000 5000 0000
+   704  type 52 sub  20  0006 5000 0000 5000 0000 5000 0000
+   705  type 52 sub  20  0009 5000 0000 5000 0000 5000 0000
+   706  type 52 sub  20  000C 5000 0000 5000 0000 5000 0000
+   707  type 52 sub  20  000F 5000 0000 5000 0000 5000 0000
+   708  type 52 sub  20  0012 5000 0000 5000 0000 5000 0000
+   709  type 52 sub  20  0015 5000 0000 5000 0000 5000 0000
+   710  type 52 sub  20  0018 5000 0000 5000 0000 5000 0000
+   711  type 52 sub  20  001B 5000 0000 5000 0000 5000 0000
+   712  type 52 sub  20  001E 5000 0000 5000 0000 5000 0000
+   713  type 52 sub  20  0021 5000 0000 5000 0000 5000 0000
+   714  type 52 sub  20  0024 5000 0000 5000 0000 5000 0000
+   715  type 52 sub  20  0027 5000 0000 5000 0000 5000 0000
+   716  type 52 sub  20  002A 5000 0000 5000 0000 5000 0000
+   717  type 52 sub  20  002D 5000 0000 5000 0000 5000 0000
+   718  type 52 sub  20  0030 5000 0000 5000 0000 5000 0000
+   719  type 52 sub  20  0033 5000 0000 5000 0000 5000 0000
+   720  type 52 sub  20  0036 5000 0000 5000 0000 5000 0000
+   721  type 52 sub  20  0039 5000 0000 5000 0000 5000 0000
+   722  type 52 sub  20  003C 5000 0000 5000 0000 5000 0000
+   723  type 52 sub  20  003F 5000 0000 5000 0000 5000 0000
+   724  type 52 sub  20  0042 5000 0000 5000 0000 5000 0000
+   725  type 52 sub  20  0045 5000 0000 5000 0000 5000 0000
+   726  type 52 sub  20  0048 5000 0000 5000 0000 5000 0000
+   727  type 52 sub  20  004B 5000 0000 5000 0000 5000 0000
+   728  type 52 sub  20  004E 5000 0000 5000 0000 5000 0000
+   729  type 52 sub  20  0051 5000 0000 5000 0000 5000 0000
+   730  type 52 sub  20  0054 5000 0000 5000 0000 5000 0000
+   731  type 52 sub  20  0057 5000 0000 5000 0000 5000 0000
+   732  type 52 sub  20  005A 5000 0000 5000 0000 5000 0000
+   733  type 52 sub  20  005D 5000 0000 5000 0000 5000 0000
+   734  type 52 sub  20  0060 5000 0000 5000 0000 5000 0000
+   735  type 52 sub  20  0063 5000 0000 5000 0000 5000 0000
+   736  type 52 sub  20  0066 5000 0000 5000 0000 5000 0000
+   737  type 52 sub  20  0069 5000 0000 5000 0000 5000 0000
+   738  type 52 sub  20  006C 5000 0000 5000 0000 5000 0000
+   739  type 52 sub  20  006F 5000 0000 5000 0000 5000 0000
+   740  type 52 sub  20  0072 5000 0000 5000 0000 5000 0000
+   741  type 52 sub  20  0075 5000 0000 5000 0000 5000 0000
+   742  type 52 sub  20  0078 5000 0000 5000 0000 5000 0000
+   743  type 52 sub  20  007B 5000 0000 5000 0000 5000 0000
+   744  type 52 sub  20  007E 5000 0000 5000 0000 5000 0000
+   745  type 52 sub  20  0081 5000 0000 5000 0000 5000 0000
+   746  type 52 sub  20  0084 5000 0000 5000 0000 5000 0000
+   747  type 52 sub  20  0087 5000 0000 5000 0000 5000 0000
+   748  type 52 sub  20  008A 5000 0000 5000 0000 5000 0000
+   749  type 52 sub  20  008D 5000 0000 5000 0000 5000 0000
+   750  type 52 sub  20  0090 5000 0000 5000 0000 5000 0000
+   751  type 52 sub  20  0093 5000 0000 5000 0000 5000 0000
+   752  type 52 sub  20  0096 5000 0000 5000 0000 5000 0000
+   753  type 52 sub  20  0099 5000 0000 5000 0000 5000 0000
+   754  type 52 sub  20  009C 5000 0000 5000 0000 5000 0000
+   755  type 52 sub  20  009F 5000 0000 5000 0000 5000 0000
+   756  type 52 sub  20  00A2 5000 0000 5000 0000 5000 0000
+   757  type 52 sub  20  00A5 5000 0000 5000 0000 5000 0000
+   758  type 52 sub  20  00A8 5000 0000 5000 0000 5000 0000
+   759  type 52 sub  20  00AB 5000 0000 5000 0000 5000 0000
+   760  type 52 sub  20  00AE 5000 0000 5000 0000 5000 0000
+   761  type 52 sub  20  00B1 5000 0000 5000 0000 5000 0000
+   762  type 54 sub  20  0000 0000 0000 0000 0000 0000 0000
+   763  type 01 sub  21  0000 3CDB 0000 0000 0000 0000 0000
+   764  type 53 sub  21  0000 5000 0FCE 0000 0000 0000 0000
+   765  type 52 sub  21  0000 5000 0000 5000 0000 5000 0000
+   766  type 52 sub  21  0003 5000 0000 5000 0000 5000 0000
+   767  type 52 sub  21  0006 5000 0000 5000 0000 5000 0000
+   768  type 52 sub  21  0009 5FFF 0001 5FFD 0001 5FFC 0002
+   769  type 52 sub  21  000C 5FFA 0004 5FF7 0004 5FF5 0005
+   770  type 52 sub  21  000F 5FF3 0005 5FF0 0004 5FEE 0005
+   771  type 52 sub  21  0012 5FEE 0004 5FEC 0002 5FEB 0003
+   772  type 52 sub  21  0015 5FEB 0003 5FEA 0003 5FE9 0002
+   773  type 52 sub  21  0018 5FE8 0001 5FE9 0002 5FE8 0000
+   774  type 52 sub  21  001B 5FE8 0001 5FE7 0000 5FE6 0FFF
+   775  type 52 sub  21  001E 5FE6 0FFE 5FE7 0FFE 5FE4 0FFD
+   776  type 52 sub  21  0021 5FE5 0FFC 5FE7 0FFB 5FE7 0FFB
+   777  type 52 sub  21  0024 5FE8 0FFA 5FE9 0FFA 5FEA 0FFA
+   778  type 52 sub  21  0027 5FEC 0FF8 5FED 0FF9 5FED 0FF9
+   779  type 52 sub  21  002A 5FEE 0FFA 5FEE 0FFD 5FEF 0FFA
+   780  type 52 sub  21  002D 5FEF 0FFA 5FEF 0FFA 5FEE 0FFA
+   781  type 52 sub  21  0030 5FEE 0FF9 5FEE 0FFC 5FEC 0FF8
+   782  type 52 sub  21  0033 5FED 0FF8 5FEC 0FF8 5FED 0FF8
+   783  type 52 sub  21  0036 5FEC 0FF8 5FED 0FFC 5FED 0FF8
+   784  type 52 sub  21  0039 5FED 0FF7 5FEE 0FF7 5FEF 0FF7
+   785  type 52 sub  21  003C 5FF0 0FF7 5FE5 0FEF 5FF5 0FF8
+   786  type 52 sub  21  003F 5FF6 0FF8 5FF8 0FF9 5FF9 0FF8
+   787  type 52 sub  21  0042 5FF9 0FF7 5FFA 0FF8 5FFA 0FF8
+   788  type 52 sub  21  0045 5FFB 0FF8 5FFC 0FF7 5FFD 0FF6
+   789  type 52 sub  21  0048 5FFC 0FF6 5FFC 0FF6 5FFC 0FF6
+   790  type 52 sub  21  004B 5FFD 0FF6 5FFD 0FF6 5FFD 0FF6
+   791  type 52 sub  21  004E 5FFE 0FF7 5FFF 0FF6 5FFF 0FF6
+   792  type 52 sub  21  0051 5FFF 0FF5 5000 0FF4 5000 0FF4
+   793  type 52 sub  21  0054 5001 0FF4 5001 0FF4 5002 0FF4
+   794  type 52 sub  21  0057 5001 0FF3 5002 0FF2 5003 0FF3
+   795  type 52 sub  21  005A 5003 0FF4 5004 0FF4 5003 0FF4
+   796  type 52 sub  21  005D 5004 0FF4 5005 0FF4 5006 0FF3
+   797  type 52 sub  21  0060 5006 0FF4 5007 0FF3 5008 0FF5
+   798  type 52 sub  21  0063 5009 0FF5 5009 0FF6 5009 0FF7
+   799  type 52 sub  21  0066 5009 0FF7 500A 0FF8 5009 0FF8
+   800  type 52 sub  21  0069 5009 0FF9 5009 0FF9 5009 0FFA
+   801  type 52 sub  21  006C 5008 0FF9 5009 0FFD 5008 0FF9
+   802  type 52 sub  21  006F 500A 0FFA 5009 0FFA 500A 0FFA
+   803  type 52 sub  21  0072 500A 0FFA 500A 0FFA 500A 0FFB
+   804  type 52 sub  21  0075 500A 0FFB 500B 0FFB 500B 0FFC
+   805  type 52 sub  21  0078 500A 0FFC 5018 0FF8 500C 0FFD
+   806  type 52 sub  21  007B 500C 0FFC 500D 0FFE 500D 0FFD
+   807  type 52 sub  21  007E 500E 0FFE 500E 0FFF 500E 0FFE
+   808  type 52 sub  21  0081 500F 0FFF 500F 0FFF 5010 0FFF
+   809  type 52 sub  21  0084 5010 0000 5012 0FFF 5012 0001
+   810  type 52 sub  21  0087 5012 0000 5011 0001 5012 0000
+   811  type 52 sub  21  008A 5012 0001 5012 0001 5012 0002
+   812  type 52 sub  21  008D 5013 0001 5013 0002 5012 0002
+   813  type 52 sub  21  0090 5013 0003 5014 0003 5014 0004
+   814  type 52 sub  21  0093 5013 0004 5013 0005 5013 0005
+   815  type 52 sub  21  0096 5012 0005 5013 0006 5012 0006
+   816  type 52 sub  21  0099 5013 0006 5012 0007 5012 0008
+   817  type 52 sub  21  009C 5014 0008 5014 0009 5014 0009
+   818  type 52 sub  21  009F 5015 000B 5016 000B 5015 000B
+   819  type 52 sub  21  00A2 5015 000D 5014 000C 5015 000D
+   820  type 52 sub  21  00A5 5014 000F 5015 000F 5014 0011
+   821  type 52 sub  21  00A8 5014 0011 5015 0012 5014 0012
+   822  type 52 sub  21  00AB 5014 0011 5013 0012 5012 0011
+   823  type 52 sub  21  00AE 5011 0011 5011 0013 5011 0012
+   824  type 52 sub  21  00B1 500F 0012 500E 0013 500D 0013
+   825  type 54 sub  21  0000 097B 0000 04ED 00DF FEDB 00AB
+   826  type 01 sub 254  0000 3F09 0000 0000 0000 0000 0000

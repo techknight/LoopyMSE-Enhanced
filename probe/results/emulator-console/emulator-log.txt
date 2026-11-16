@@ -38,5 +38,5 @@
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator-console\21-scan-mouse.png
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator-console\99-done.png
 [INFO] [Automation] dumped sram (32768 bytes) to G:\LoopyMSE-Enhanced\probe\results\emulator-console\probe-sram.bin
-[INFO] Exiting at frame 4673: G:\LoopyMSE-Enhanced\probe\emulator-script.txt: exit
-[INFO] [Automation] G:\LoopyMSE-Enhanced\probe\emulator-script.txt finished at frame 4673
+[INFO] Exiting at frame 4672: G:\LoopyMSE-Enhanced\probe\emulator-script.txt: exit
+[INFO] [Automation] G:\LoopyMSE-Enhanced\probe\emulator-script.txt finished at frame 4672
