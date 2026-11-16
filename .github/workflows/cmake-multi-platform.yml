@@ -36,15 +36,10 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Dependencies (MacOS)
-      if: startsWith(matrix.os, 'macos-')
-      shell: bash
-      run: brew install boost
-
     - name: Dependencies (Ubuntu)
       if: startsWith(matrix.os, 'ubuntu-')
       shell: bash
-      run: sudo apt update && sudo apt install -y libboost-all-dev cmake
+      run: sudo apt update && sudo apt install -y cmake libx11-dev libxext-dev libasound2-dev libpulse-dev
 
     - name: Dependencies (Windows)
       id: msys2
@@ -58,7 +53,7 @@ jobs:
         # Update MSYS2 installation through pacman
         #update: # optional
         # After installation and/or update, install additional packages through pacman
-        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake mingw-w64-x86_64-boost
+        install: mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake
         # After installation and/or update, install additional packages through pacboy
         #pacboy: # optional
         # Retrieve and extract base installation from upstream GitHub Releases

@@ -1,6 +1,13 @@
 #include <SDL.h>
+#include <automation/automation.h>
+#include <automation/debugtools.h>
 #include <common/bswp.h>
+#include <core/cart.h>
 #include <core/config.h>
+#include <core/loopy_io.h>
+#include <core/sh2/sh2.h>
+#include <core/sh2/sh2_bus.h>
+#include <core/sh2/sh2_cost.h>
 #include <core/system.h>
 #include <input/input.h>
 #include <log/log.h>
@@ -8,12 +15,19 @@
 #include <sound/sound.h>
 #include <video/video.h>
 
+#include <algorithm>
+#include <cctype>
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
+#include <iterator>
+#include <string>
+#include <vector>
 
+#include "autodrive.h"
 #include "config.h"
 #include "options.h"
 
@@ -46,6 +60,7 @@ struct Screen
 	bool correct_aspect_ratio;
 	bool crop_overscan;
 	bool antialias;
+	bool hidden = false;
 
 	bool is_fullscreen()
 	{
@@ -117,7 +132,7 @@ SDL_Point resize_window(bool apply = true, int scale = 0)
 	{
 		SDL_SetWindowSize(screen.window, frame.x, frame.y);
 	}
-	Log::info("[SCREEN] size width=%d height=%d", frame.x, frame.y);
+	Log::debug("[SCREEN] size width=%d height=%d", frame.x, frame.y);
 	return frame;
 }
 
@@ -173,6 +188,8 @@ static inline void set_draw_color_16bpp(uint16_t c)
 
 void update(uint16_t* display_output, int visible_scanlines, uint16_t background_color)
 {
+	if (screen.hidden) return;
+
 	if (visible_scanlines != screen.visible_scanlines)
 	{
 		screen.visible_scanlines = visible_scanlines;
@@ -234,43 +251,53 @@ void update(uint16_t* display_output, int visible_scanlines, uint16_t background
 	SDL_RenderPresent(screen.renderer);
 }
 
-void initialize(Options::Args& args)
+void initialize(Options::Args& args, const std::string& title_suffix)
 {
 	//Allow use of our own main()
 	SDL_SetMainReady();
 
-	//Try synchronizing window drawing to VBLANK
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+	screen.hidden = args.window == "hidden";
+	bool vsync = args.speed == 1.0 && !screen.hidden;
+
+	//Try synchronizing window drawing to VBLANK (only at normal speed)
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, vsync ? "1" : "0");
 	SDL_SetHint(SDL_HINT_FRAMEBUFFER_ACCELERATION, "1");
 	//Workaround for bug in SDL2 2.32 where window doesn't activate, not needed in 2.30
 	SDL_SetHint(SDL_HINT_MAC_BACKGROUND_APP, "0");
+	if (args.unattended())
+	{
+		//Never take the focus from whatever the user is doing
+		SDL_SetHint(SDL_HINT_WINDOW_NO_ACTIVATION_WHEN_SHOWN, "1");
+	}
 
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER) < 0)
 	{
 		Log::error("Failed to initialize SDL2: %s", SDL_GetError());
-		exit(0);
+		exit(Automation::EXIT_USAGE);
 	}
 
 	//Set up SDL screen
 	screen.correct_aspect_ratio = args.correct_aspect_ratio;
 	screen.crop_overscan = args.crop_overscan;
 	screen.antialias = args.antialias;
-	screen.window_int_scale = std::clamp(args.int_scale, 1, MAX_WINDOW_INT_SCALE);
+	screen.window_int_scale = std::clamp(args.scale, 1, MAX_WINDOW_INT_SCALE);
 	screen.prescale = args.antialias ? PRESCALE_FACTOR : 1;
 
-	char title[64];
-	snprintf(title, sizeof(title), "%s %s", PROJECT_DESCRIPTION, PROJECT_VERSION);
+	std::string title = std::string(PROJECT_DESCRIPTION) + " " + PROJECT_VERSION + title_suffix;
 	SDL_Point window_size = resize_window(false);
 	Uint32 window_opts = 0;
 	window_opts |= args.crop_overscan ? 0 : SDL_WINDOW_RESIZABLE;
-	window_opts |= args.start_in_fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+	window_opts |= args.fullscreen && !screen.hidden ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0;
+	window_opts |= screen.hidden ? SDL_WINDOW_HIDDEN : 0;
+	window_opts |= args.window == "minimized" ? SDL_WINDOW_MINIMIZED : 0;
 	screen.window = SDL_CreateWindow(
-		title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_opts
+		title.c_str(), SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, window_size.x, window_size.y, window_opts
 	);
 	window_size = resize_window(false, 1);
 	SDL_SetWindowMinimumSize(screen.window, window_size.x, window_size.y);
 
-	screen.renderer = SDL_CreateRenderer(screen.window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+	screen.renderer =
+		SDL_CreateRenderer(screen.window, -1, SDL_RENDERER_ACCELERATED | (vsync ? SDL_RENDERER_PRESENTVSYNC : 0));
 
 	screen.framebuffer = SDL_CreateTexture(
 		screen.renderer, SDL_PIXELFORMAT_ARGB1555, SDL_TEXTUREACCESS_STREAMING, DISPLAY_WIDTH, DISPLAY_HEIGHT
@@ -293,7 +320,7 @@ void initialize(Options::Args& args)
 
 	if (SDL_GameControllerAddMappingsFromFile((RESOURCE_PATH / CONTROLLER_DB_PATH).string().c_str()) < 0)
 	{
-		Log::warn("Could not load game controller database: %s", SDL_GetError());
+		Log::debug("Could not load game controller database: %s", SDL_GetError());
 		// Nonfatal: continue without the mappings
 	}
 	open_first_controller();
@@ -305,25 +332,79 @@ void initialize(Options::Args& args)
 
 }  // namespace SDL
 
-fs::path get_full_screenshot_path(Config::SystemInfo& config, std::string prefix = "loopymse_")
+namespace
 {
-	return config.emulator.image_save_directory / imagew::make_unique_name(prefix).replace_extension(
-													  imagew::image_extension(config.emulator.screenshot_image_type)
-												  );
+
+Config::SystemInfo config;
+Options::Args args;
+
+// Frames emulated since power-on (continues across reboots)
+uint64_t frame = 0;
+bool has_quit = false;
+int exit_code = Automation::EXIT_OK;
+double speed = 1.0;
+bool focus_paused = false;
+uint64_t last_frame_ticks = 0;
+uint32_t prof_watch_start = 0;
+
+fs::path output_dir;
+fs::path shot_dir;
+fs::path print_dir;
+
+// Games known to use the XN-110 mouse, by the checksum in their header
+// (the list from LoopyMSE's mouse-detection branch).
+const uint32_t MOUSE_CARTS[] = {
+	0xA5341F72,	 // Chakrakun no Omajinai Paradise
+	0xF294F931,	 // Pasokon Collection
+	0x6A410BB2,	 // Little Romance
+	0x8373E9DD,	 // Loopy Town no Oheya ga Hoshii!
+	0x6E00CE71,	 // Lupiton no Wonder Palette
+};
+
+uint32_t header_checksum(const std::vector<uint8_t>& rom)
+{
+	if (rom.size() < 12) return 0;
+	return (uint32_t)rom[8] << 24 | (uint32_t)rom[9] << 16 | (uint32_t)rom[10] << 8 | rom[11];
 }
 
-std::string remove_extension(std::string file_path)
+bool is_mouse_cart(const std::vector<uint8_t>& rom)
 {
-	auto pos = file_path.find(".");
-	if (pos == std::string::npos)
-	{
-		return file_path;
-	}
-
-	return file_path.substr(0, pos);
+	uint32_t sum = header_checksum(rom);
+	return std::find(std::begin(MOUSE_CARTS), std::end(MOUSE_CARTS), sum) != std::end(MOUSE_CARTS);
 }
 
-bool load_cart(Config::SystemInfo& config, std::string path)
+// Relative output files go into paths.output when it is set.
+fs::path output_file(const std::string& name)
+{
+	fs::path p(name);
+	if (p.is_relative() && !output_dir.empty()) return output_dir / p;
+	return p;
+}
+
+fs::path sram_path_for(const fs::path& rom_path)
+{
+	if (!args.sram_path.empty()) return output_file(args.sram_path);
+	fs::path name = rom_path.filename();
+	name.replace_extension(".sav");
+	if (!output_dir.empty()) return output_dir / name;
+	fs::path p = rom_path;
+	return p.replace_extension(".sav");
+}
+
+void set_output_dirs_for(const fs::path& rom_path)
+{
+	fs::path rom_dir = fs::absolute(rom_path).parent_path();
+	fs::path base = output_dir.empty() ? rom_dir : output_dir;
+	shot_dir = args.screenshot_dir.empty() ? base : fs::absolute(args.screenshot_dir);
+	print_dir = args.print_dir.empty() ? base : fs::absolute(args.print_dir);
+	std::error_code ec;
+	fs::create_directories(shot_dir, ec);
+	fs::create_directories(print_dir, ec);
+	config.emulator.image_save_directory = shot_dir;
+	config.emulator.print_directory = print_dir;
+}
+
+bool load_cart(const std::string& path)
 {
 	config.cart = {};
 
@@ -337,6 +418,12 @@ bool load_cart(Config::SystemInfo& config, std::string path)
 	config.cart.rom_path = path;
 	config.cart.rom.assign(std::istreambuf_iterator<char>(cart_file), {});
 	cart_file.close();
+	if (config.cart.rom.size() < 0x20)
+	{
+		Log::error("%s is too small to be a Loopy ROM", path.c_str());
+		config.cart = {};
+		return false;
+	}
 
 	//Determine the size of SRAM from the cartridge header
 	uint32_t sram_start, sram_end;
@@ -345,15 +432,16 @@ bool load_cart(Config::SystemInfo& config, std::string path)
 	uint32_t sram_size = Common::bswp32(sram_end) - Common::bswp32(sram_start) + 1;
 
 	//Attempt to load SRAM from a file
-	config.cart.sram_file_path = remove_extension(path) + ".sav";
+	config.cart.sram_file_path = sram_path_for(path).string();
 	std::ifstream sram_file(config.cart.sram_file_path, std::ios::binary);
 	if (!sram_file.is_open())
 	{
-		Log::debug("Creating save state at %s.", config.cart.sram_file_path.c_str());
+		Log::debug("No save file yet at %s", config.cart.sram_file_path.c_str());
 	}
 	else
 	{
 		config.cart.sram.assign(std::istreambuf_iterator<char>(sram_file), {});
+		config.cart.sram_from_file = true;
 		sram_file.close();
 	}
 
@@ -361,36 +449,15 @@ bool load_cart(Config::SystemInfo& config, std::string path)
 	//If a file was loaded but was smaller than the SRAM size, the uninitialized bytes will be 0xFF.
 	//If the file was larger, then the vector size is clamped
 	config.cart.sram.resize(sram_size, 0xFF);
+	set_output_dirs_for(path);
 	return true;
 }
 
-bool load_bios(Config::SystemInfo& config, fs::path path)
+bool load_file(std::vector<uint8_t>& out, const fs::path& path)
 {
-	std::ifstream bios_file(path, std::ios::binary);
-	if (!bios_file.is_open())
-	{
-		Log::debug("Couldn't load BIOS at %s", path.string().c_str());
-		return false;
-	}
-	Log::info("Located BIOS at %s", path.string().c_str());
-
-	config.bios_rom.assign(std::istreambuf_iterator<char>(bios_file), {});
-	bios_file.close();
-	return true;
-}
-
-bool load_sound_bios(Config::SystemInfo& config, fs::path path)
-{
-	std::ifstream sound_rom_file(path, std::ios::binary);
-	if (!sound_rom_file.is_open())
-	{
-		Log::debug("Couldn't load Sound BIOS at %s", path.string().c_str());
-		return false;
-	}
-	Log::info("Located Sound BIOS at %s", path.string().c_str());
-
-	config.sound_rom.assign(std::istreambuf_iterator<char>(sound_rom_file), {});
-	sound_rom_file.close();
+	std::ifstream file(path, std::ios::binary);
+	if (!file.is_open()) return false;
+	out.assign(std::istreambuf_iterator<char>(file), {});
 	return true;
 }
 
@@ -415,39 +482,425 @@ std::vector<fs::path> search_paths(fs::path file_path, fs::path cart_path)
 	return vec;
 }
 
-int main(int argc, char** argv)
+void request_exit(int code, const std::string& why)
 {
-	bool has_quit = false;
-	bool is_paused = false;
-
-	Config::SystemInfo config;
-	Options::Args args;
-
-	if (!fs::exists(PREFS_PATH / INI_PATH))
+	if (has_quit) return;
+	has_quit = true;
+	exit_code = code;
+	if (code == Automation::EXIT_OK) Log::info("Exiting at frame %llu: %s", (unsigned long long)frame, why.c_str());
+	else Log::error("Exiting with code %d at frame %llu: %s", code, (unsigned long long)frame, why.c_str());
+	if (Automation::control_enabled())
 	{
-		Log::info("Creating default ini file");
-		fs::copy_file(RESOURCE_PATH / INI_PATH, PREFS_PATH / INI_PATH);
+		printf("exit %llu %d\n", (unsigned long long)frame, code);
+		fflush(stdout);
+	}
+}
+
+void plug(bool mouse)
+{
+	if (mouse == Input::is_mouse_plugged()) return;
+	if (!mouse && SDL::is_mouse_captured())
+	{
+		SDL::capture_mouse(false);
+	}
+	Input::inject_mouse_buttons(Input::MOUSE_L | Input::MOUSE_R, false);
+	Input::set_mouse_plugged(mouse);
+	Log::info(mouse ? "Loopy mouse plugged in" : "Gamepad plugged in");
+}
+
+void reboot()
+{
+	if (!config.cart.is_loaded()) return;
+	Log::info("Rebooting Loopy...");
+	Autodrive::reset();
+	System::shutdown(config);
+	System::initialize(config);
+	last_frame_ticks = SDL_GetPerformanceCounter();
+}
+
+std::string sanitize(const std::string& name)
+{
+	std::string out;
+	for (char c : name)
+	{
+		out += (std::isalnum((unsigned char)c) || c == '-' || c == '_' || c == '.') ? c : '_';
+	}
+	return out;
+}
+
+// Save the raw picture of the last emulated frame.
+std::string take_shot(const std::string& name)
+{
+	int type = imagew::parse_image_type(args.screenshot_image_type, imagew::IMAGE_TYPE_DEFAULT);
+	fs::path file;
+	if (name.empty())
+	{
+		char buf[40];
+		snprintf(buf, sizeof buf, "frame_%06llu", (unsigned long long)frame);
+		file = buf;
+	}
+	else
+	{
+		file = sanitize(name);
+	}
+	if (!file.has_extension()) file += imagew::image_extension(type);
+	fs::path path = shot_dir / file;
+	bool ok = imagew::save_image_16bpp(
+		type, path, Video::DISPLAY_WIDTH, Video::get_display_scanlines(), Video::get_display_output()
+	);
+	if (!ok) return "";
+	Log::info("[Automation] screenshot %s", path.string().c_str());
+	return path.string();
+}
+
+// Memory dumps for the "dump" command: raw bytes as the CPU sees them.
+bool dump_memory(const std::string& what, const std::string& name, std::string& error)
+{
+	struct Region
+	{
+		const char* name;
+		uint32_t addr;
+		uint32_t size;
+	};
+	static const Region REGIONS[] = {
+		{"ram", 0x09000000, 0x80000},		 {"bitmap", Video::BITMAP_VRAM_START, Video::BITMAP_VRAM_SIZE},
+		{"tiles", Video::TILE_VRAM_START, Video::TILE_VRAM_SIZE}, {"oam", Video::OAM_START, Video::OAM_SIZE},
+		{"palette", Video::PALETTE_START, Video::PALETTE_SIZE},   {"onchip", 0x0F000000, 0x400},
+	};
+	std::vector<uint8_t> data;
+	if (what == "sram")
+	{
+		data = config.cart.sram;
+		uint32_t sram_start;
+		memcpy(&sram_start, config.cart.rom.data() + 0x10, 4);
+		sram_start = Common::bswp32(sram_start);
+		for (size_t i = 0; i < data.size(); i++) data[i] = SH2::Bus::read8(sram_start + (uint32_t)i);
+	}
+	else
+	{
+		const Region* region = nullptr;
+		for (const auto& r : REGIONS)
+		{
+			if (what == r.name) region = &r;
+		}
+		if (!region)
+		{
+			error = "unknown dump '" + what + "' (ram sram bitmap tiles oam palette onchip)";
+			return false;
+		}
+		data.resize(region->size);
+		for (uint32_t i = 0; i < region->size; i++) data[i] = SH2::Bus::read8(region->addr + i);
+	}
+	fs::path path = output_file(name);
+	std::ofstream file(path, std::ios::binary);
+	if (!file.is_open())
+	{
+		error = "cannot write " + path.string();
+		return false;
+	}
+	file.write((const char*)data.data(), data.size());
+	Log::info("[Automation] dumped %s (%zu bytes) to %s", what.c_str(), data.size(), path.string().c_str());
+	return true;
+}
+
+void apply_bindings()
+{
+	static const std::pair<const char*, Input::PadButton> PAD[] = {
+		{"up", Input::PAD_UP},	   {"down", Input::PAD_DOWN}, {"left", Input::PAD_LEFT}, {"right", Input::PAD_RIGHT},
+		{"start", Input::PAD_START}, {"a", Input::PAD_A},		  {"b", Input::PAD_B},		 {"c", Input::PAD_C},
+		{"d", Input::PAD_D},		 {"l", Input::PAD_L1},		  {"r", Input::PAD_R1},
+	};
+	for (const auto& [name, button] : PAD)
+	{
+		const std::string& key = args.keyboard[name];
+		SDL_Keycode code = SDL_GetKeyFromName(key.c_str());
+		if (code == SDLK_UNKNOWN) Log::error("keyboard.%s: unknown key '%s'", name, key.c_str());
+		else Input::add_key_binding(code, button);
+
+		const std::string& pad = args.controller[name];
+		SDL_GameControllerButton b = SDL_GameControllerGetButtonFromString(pad.c_str());
+		if (b == SDL_CONTROLLER_BUTTON_INVALID) Log::error("controller.%s: unknown button '%s'", name, pad.c_str());
+		else Input::add_controller_binding(b, button);
+	}
+}
+
+void run_frame()
+{
+	if (!args.profile_file.empty() && frame == args.profile_from)
+	{
+		SH2::profile_enable(true);
+		if (args.profile_watch) prof_watch_start = SH2::Bus::read32(args.profile_watch);
 	}
 
-	Options::parse_config(PREFS_PATH / INI_PATH, args);
-	Options::parse_commandline(argc, argv, args);
+	DebugTools::begin_frame(frame);
+	System::run();
+	Autodrive::run_frame();
+	frame++;
+	Log::set_frame(frame);
 
+	if (!args.profile_file.empty() && frame == args.profile_to)
+	{
+		SH2::profile_enable(false);
+		std::string note;
+		if (args.profile_watch)
+		{
+			char buf[96];
+			snprintf(
+				buf, sizeof buf, "watch %08X start %u end %u fields %llu", (unsigned)args.profile_watch,
+				(unsigned)prof_watch_start, (unsigned)SH2::Bus::read32(args.profile_watch),
+				(unsigned long long)(args.profile_to - args.profile_from)
+			);
+			note = buf;
+		}
+		fs::path path = output_file(args.profile_file);
+		if (SH2::profile_write(path.string(), note)) Log::info("Wrote CPU profile %s", path.string().c_str());
+		else Log::error("Could not write CPU profile %s", path.string().c_str());
+	}
+
+	if (args.strict && Log::unimplemented_count())
+	{
+		request_exit(Automation::EXIT_STRICT, "the program used unimplemented hardware (debug.strict)");
+	}
+}
+
+void handle_event(SDL_Event& e)
+{
+	switch (e.type)
+	{
+	case SDL_QUIT:
+		request_exit(Automation::EXIT_OK, "window closed");
+		break;
+	case SDL_KEYDOWN:
+		Input::set_key_state(e.key.keysym.sym, true);
+		break;
+	case SDL_KEYUP:
+	{
+		SDL_Keycode keycode = e.key.keysym.sym;
+		switch (keycode)
+		{
+		case SDLK_F1:
+			plug(false);
+			break;
+		case SDLK_F2:
+			if (!Input::is_mouse_plugged())
+			{
+				plug(true);
+				if (!Input::is_user_input_blocked()) Log::info("Click the window to capture the mouse");
+			}
+			else if (SDL::is_mouse_captured())
+			{
+				SDL::capture_mouse(false);
+				Input::set_mouse_button_state(SDL_BUTTON_LEFT, false);
+				Input::set_mouse_button_state(SDL_BUTTON_RIGHT, false);
+			}
+			break;
+		case SDLK_F10:
+			if (config.cart.is_loaded())
+			{
+				int type = imagew::parse_image_type(args.screenshot_image_type, imagew::IMAGE_TYPE_DEFAULT);
+				auto path = [type]() {
+					return shot_dir / imagew::make_unique_name("loopymse_").replace_extension(imagew::image_extension(type));
+				};
+				// Raw video buffer
+				imagew::save_image_16bpp(
+					type, path(), Video::DISPLAY_WIDTH, Video::get_display_scanlines(), Video::get_display_output()
+				);
+				if (args.correct_aspect_ratio && !SDL::screen.hidden)
+				{
+					// Export both scaled and original, let user decide which they want
+					SDL::screenshot(type, path());
+				}
+			}
+			break;
+		case SDLK_F11:
+			SDL::toggle_fullscreen();
+			break;
+		case SDLK_F12:
+			reboot();
+			break;
+		case SDLK_MINUS:
+			if (!SDL::screen.is_fullscreen())
+			{
+				SDL::change_window_scale(-1);
+			}
+			break;
+		case SDLK_EQUALS:
+			if (!SDL::screen.is_fullscreen())
+			{
+				SDL::change_window_scale(1);
+			}
+			break;
+		case SDLK_ESCAPE:
+			if (SDL::screen.is_fullscreen())
+			{
+				SDL::toggle_fullscreen();
+			}
+			else
+			{
+				request_exit(Automation::EXIT_OK, "escape pressed");
+			}
+			break;
+		default:
+			Input::set_key_state(keycode, false);
+			break;
+		}
+		break;
+	}
+	case SDL_CONTROLLERBUTTONDOWN:
+		// Quit on select+start
+		if (SDL::controller && SDL_GameControllerGetButton(SDL::controller, SDL_CONTROLLER_BUTTON_START) &&
+			SDL_GameControllerGetButton(SDL::controller, SDL_CONTROLLER_BUTTON_BACK))
+		{
+			request_exit(Automation::EXIT_OK, "select+start pressed");
+			break;
+		}
+		Input::set_controller_state(e.cbutton.button, true);
+		break;
+	case SDL_CONTROLLERBUTTONUP:
+		Input::set_controller_state(e.cbutton.button, false);
+		break;
+	case SDL_WINDOWEVENT:
+		switch (e.window.event)
+		{
+		case SDL_WINDOWEVENT_FOCUS_GAINED:
+			if (!args.run_in_background)
+			{
+				Sound::set_mute(false);
+				focus_paused = false;
+			}
+			break;
+		case SDL_WINDOWEVENT_FOCUS_LOST:
+			if (!args.run_in_background)
+			{
+				Sound::set_mute(true);
+				focus_paused = true;
+			}
+			if (SDL::is_mouse_captured())
+			{
+				SDL::capture_mouse(false);
+				Input::set_mouse_button_state(SDL_BUTTON_LEFT, false);
+				Input::set_mouse_button_state(SDL_BUTTON_RIGHT, false);
+			}
+			break;
+		}
+		break;
+	case SDL_MOUSEBUTTONDOWN:
+		if (SDL::is_mouse_captured())
+		{
+			Input::set_mouse_button_state(e.button.button, true);
+		}
+		else if (Input::is_mouse_plugged() && !Input::is_user_input_blocked())
+		{
+			SDL::capture_mouse(true);
+		}
+		break;
+	case SDL_MOUSEBUTTONUP:
+		if (SDL::is_mouse_captured())
+		{
+			Input::set_mouse_button_state(e.button.button, false);
+		}
+		break;
+	case SDL_MOUSEMOTION:
+		if (SDL::is_mouse_captured())
+		{
+			Input::move_mouse(e.motion.xrel, -e.motion.yrel);
+		}
+		break;
+	case SDL_CONTROLLERDEVICEADDED:
+		if (!SDL::controller)
+		{
+			Log::info("New controller added.");
+			SDL::open_first_controller();
+		}
+		break;
+	case SDL_CONTROLLERDEVICEREMOVED:
+		// Only react to current device being removed
+		if (SDL::controller &&
+			e.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(SDL::controller)))
+		{
+			Log::info("Controller removed, using next available one.");
+			SDL_GameControllerClose(SDL::controller);
+			SDL::open_first_controller();
+		}
+		break;
+	case SDL_DROPFILE:
+	{
+		std::string path = e.drop.file;
+		SDL_free(e.drop.file);
+		if (config.cart.is_loaded()) System::shutdown(config);
+		if (load_cart(path))
+		{
+			Log::info("Loaded %s...", path.c_str());
+			Autodrive::reset();
+			System::initialize(config);
+			// So you can tell that MSE is running even before you click into it
+			focus_paused = false;
+			last_frame_ticks = SDL_GetPerformanceCounter();
+		}
+		break;
+	}
+	}
+}
+
+}  // namespace
+
+int main(int argc, char** argv)
+{
+	switch (Options::parse(argc, argv, PREFS_PATH / INI_PATH, RESOURCE_PATH / INI_PATH, args))
+	{
+	case Options::PARSE_EXIT_OK:
+		return Automation::EXIT_OK;
+	case Options::PARSE_EXIT_ERROR:
+		return Automation::EXIT_USAGE;
+	default:
+		break;
+	}
+
+	// Logging first, so everything after it lands in the right place
+	Log::Level level = Log::INFO;
+	Log::parse_level(args.log_level, level);
+	Log::set_level(level);
+	Log::set_frame_prefix(args.log_frames);
+	if (!args.output_dir.empty())
+	{
+		output_dir = fs::absolute(args.output_dir);
+		std::error_code ec;
+		fs::create_directories(output_dir, ec);
+	}
+	if (args.control == "stdin")
+	{
+		// stdout carries the control channel's replies only
+		Log::use_stderr(true);
+	}
+	if (!args.log_file.empty())
+	{
+		fs::path log_path = output_file(args.log_file);
+		if (!Log::open_file(log_path.string()))
+		{
+			Log::error("Could not open log file %s", log_path.string().c_str());
+			return Automation::EXIT_USAGE;
+		}
+	}
+
+	speed = args.speed;
 	config.emulator.image_save_directory = PREFS_PATH;
-	config.emulator.screenshot_image_type = args.screenshot_image_type;
-	config.emulator.printer_image_type = args.printer_image_type;
-	config.emulator.printer_view_command = args.printer_view_command;
+	config.emulator.screenshot_image_type = imagew::parse_image_type(args.screenshot_image_type, imagew::IMAGE_TYPE_DEFAULT);
+	config.emulator.printer_image_type = imagew::parse_image_type(args.printer_image_type, imagew::IMAGE_TYPE_DEFAULT);
+	config.emulator.printer_view_command = args.printer_view ? args.printer_view_command : "";
 	config.emulator.printer_correct_aspect_ratio = args.printer_correct_aspect_ratio;
 
-	Log::set_level(args.verbose ? Log::VERBOSE : Log::INFO);
-
-	// Plug in the emulated mouse at startup if configured; F2/F1 switch between mouse and gamepad at runtime
-	Input::set_mouse_plugged(args.mouse);
+	Cart::set_sram_write_enabled(args.sram_write);
+	Sound::set_output_enabled(args.sound_output == "device");
+	SH2::console_cost_enable(args.timing_model == "console");
+	SH2::Cost::set_cart_rom_cycles(args.cart_rom_cycles);
+	apply_bindings();
 
 	bool result = false;
 	for (const auto& path : search_paths(args.bios, args.cart))
 	{
-		if (load_bios(config, path))
+		if (load_file(config.bios_rom, path))
 		{
+			Log::info("Located BIOS at %s", path.string().c_str());
 			result = true;
 			break;
 		}
@@ -455,19 +908,19 @@ int main(int argc, char** argv)
 	if (!result)
 	{
 		Log::error(
-			"Error: Missing BIOS file. Provide by argument, or place at %s.\n",
+			"Missing BIOS file. Provide it with --bios, or place it at %s.",
 			(PREFS_PATH / DEFAULT_BIOS_PATH).string().c_str()
 		);
-
 		Options::print_usage();
-		exit(1);
+		return Automation::EXIT_USAGE;
 	}
 
 	result = false;
 	for (const auto& path : search_paths(args.sound_bios, args.cart))
 	{
-		if (load_sound_bios(config, path))
+		if (load_file(config.sound_rom, path))
 		{
+			Log::info("Located Sound BIOS at %s", path.string().c_str());
 			result = true;
 			break;
 		}
@@ -475,271 +928,196 @@ int main(int argc, char** argv)
 	if (!result)
 	{
 		Log::warn(
-			"Missing sound bios file. Provide by argument, or place at %s.\n"
-			"Emulation will continue without sound.\n",
+			"Missing sound BIOS file. Provide it with --sound-bios, or place it at %s.\n"
+			"Emulation will continue without sound.",
 			DEFAULT_SOUND_BIOS_PATH.string().c_str()
 		);
 	}
 
 	if (args.cart.empty())
 	{
-		Log::info("No ROM provided. Drop a Loopy ROM onto the window to play.");
-		// Appears some platforms achieve "open with" not by passing the arguments to the binary but by performing the open file action
-		// So don't prohibit starting into fullscreen without a ROM
-		// args.start_in_fullscreen = false;
-	}
-	else if (load_cart(config, args.cart))
-	{
-		fs::path rom_path = fs::absolute(config.cart.rom_path);
-		if (rom_path.has_parent_path())
+		if (args.unattended())
 		{
-			config.emulator.image_save_directory = rom_path.parent_path();
+			Log::error("An unattended run needs a ROM");
+			return Automation::EXIT_USAGE;
 		}
-		System::initialize(config);
+		Log::info("No ROM provided. Drop a Loopy ROM onto the window to play.");
 	}
-	else
+	else if (!load_cart(args.cart))
 	{
 		Log::error("Could not load ROM file.");
-		exit(1);
+		return Automation::EXIT_USAGE;
 	}
 
-	SDL::initialize(args);
+	// Plug in the controller (the plugged state survives reboots, like a real one)
+	bool mouse = args.device == "mouse" || args.autodrive ||
+				 (args.device == "auto" && config.cart.is_loaded() && is_mouse_cart(config.cart.rom));
+	Input::set_mouse_plugged(mouse);
+	if (mouse && args.device == "auto") Log::info("Known mouse game: plugging in the mouse");
+	Autodrive::set_enabled(args.autodrive);
 
-	uint64_t last_frame_ticks = SDL_GetPerformanceCounter();
+	Automation::Hooks hooks;
+	hooks.shot = take_shot;
+	hooks.reboot = reboot;
+	hooks.exit = request_exit;
+	hooks.plug = plug;
+	hooks.set_speed = [](double s) {
+		speed = s;
+		last_frame_ticks = SDL_GetPerformanceCounter();
+	};
+	hooks.mouse_to = [](int x, int y) { return Autodrive::set_target(x, y); };
+	hooks.status = []() {
+		char buf[128];
+		snprintf(
+			buf, sizeof buf, "device=%s speed=%g unimplemented=%llu", Input::is_mouse_plugged() ? "mouse" : "pad", speed,
+			(unsigned long long)Log::unimplemented_count()
+		);
+		return std::string(buf);
+	};
+	hooks.dump = dump_memory;
+	Automation::initialize(hooks);
+	Automation::set_scheduled_shots(args.shot_every, args.shot_at);
+
+	DebugTools::Settings debug;
+	for (int port = 0; port < 2; port++)
+	{
+		if (!args.serial_log[port].empty()) debug.serial_log[port] = output_file(args.serial_log[port]).string();
+	}
+	debug.serial_timed = args.serial_log_timed;
+	debug.watch_writes = args.watch_writes;
+	if (!args.watch_log.empty()) debug.watch_log = output_file(args.watch_log).string();
+	std::string debug_error;
+	if (!DebugTools::configure(debug, debug_error))
+	{
+		Log::error("%s", debug_error.c_str());
+		return Automation::EXIT_USAGE;
+	}
+	LoopyIO::set_trace(args.trace_io);
+	Video::set_raster_warnings(args.raster_warnings);
+	if (!args.script.empty())
+	{
+		std::string error;
+		if (!Automation::load_script(args.script, error))
+		{
+			Log::error("%s", error.c_str());
+			return Automation::EXIT_USAGE;
+		}
+	}
+	if (args.control == "stdin")
+	{
+		Automation::start_control_stdin();
+		Automation::set_paused(args.start_paused);
+	}
+	else if (args.start_paused)
+	{
+		Log::warn("automation.start_paused only applies with the control channel (--control)");
+	}
+
+	if (config.cart.is_loaded())
+	{
+		System::initialize(config);
+	}
+
+	std::string title_suffix;
+	if (config.cart.is_loaded()) title_suffix = " - " + fs::path(config.cart.rom_path).filename().string();
+	SDL::initialize(args, title_suffix);
+
+	const uint64_t freq = SDL_GetPerformanceFrequency();
+	constexpr int FRAMERATE = 60;  //TODO: get this from Video if it can be changed (e.g. for PAL mode)
+	constexpr uint64_t MAX_LAG_FRAMES = 5;
+	last_frame_ticks = SDL_GetPerformanceCounter();
+	uint64_t last_present = 0;
+
 	while (!has_quit)
 	{
-		constexpr int framerate_target = 60;  //TODO: get this from Video if it can be changed (e.g. for PAL mode)
-		constexpr int framerate_max_lag = 5;
-		//Check how much time passed since we drew the last frame
-		uint64_t ticks_per_frame = SDL_GetPerformanceFrequency() / framerate_target;
-		uint64_t now_ticks = SDL_GetPerformanceCounter();
-		uint64_t ticks_since_last_frame = now_ticks - last_frame_ticks;
+		uint64_t now = SDL_GetPerformanceCounter();
+		bool running = config.cart.is_loaded() && !focus_paused;
+		uint64_t ticks_per_frame = speed > 0 ? (uint64_t)(freq / (FRAMERATE * speed)) : 0;
 
-		//See how many we need to draw
-		//If we're vsynced to a 60Hz display with no lag, this should stay at 1 most of the time
-		uint64_t draw_frames = ticks_since_last_frame / ticks_per_frame;
-		last_frame_ticks += draw_frames * ticks_per_frame;
-
-		//If too far behind, draw one frame and start timing again from now
-		if (draw_frames > framerate_max_lag)
+		// How many frames are due now
+		uint64_t due = 0;
+		if (running && speed > 0)
 		{
-			Log::warn("%d frames behind, skipping ahead...", draw_frames);
-			last_frame_ticks = now_ticks;
-			draw_frames = 1;
+			due = (now - last_frame_ticks) / ticks_per_frame;
+			last_frame_ticks += due * ticks_per_frame;
+			if (due > MAX_LAG_FRAMES)
+			{
+				Log::debug("%llu frames behind, skipping ahead", (unsigned long long)due);
+				last_frame_ticks = now;
+				due = 1;
+			}
+		}
+		else if (running)
+		{
+			// As fast as possible: run for about one display frame of wall time
+			due = UINT64_MAX;
+			last_frame_ticks = now;
+		}
+		else
+		{
+			last_frame_ticks = now;
 		}
 
-		if (draw_frames && !is_paused && config.cart.is_loaded())
+		bool emulated = false;
+		for (uint64_t i = 0; i < due && !has_quit; i++)
 		{
-			while (draw_frames > 0)
+			// Commands due at this frame boundary, then the frame itself
+			Automation::update(frame);
+			if (has_quit || Automation::paused()) break;
+			if (args.exit_after_frames && frame >= args.exit_after_frames)
 			{
-				System::run();
-				draw_frames--;
+				request_exit(Automation::EXIT_OK, "frame limit reached");
+				break;
 			}
-			SDL::update(System::get_display_output(), Video::get_display_scanlines(), Video::get_background_color());
+			run_frame();
+			emulated = true;
+			if (speed == 0 && SDL_GetPerformanceCounter() - now > freq / FRAMERATE) break;
+		}
+		if (!emulated && !has_quit)
+		{
+			// Paused or between frames: still take control commands
+			Automation::update(frame);
+		}
+
+		if (emulated && config.cart.is_loaded() && !SDL::screen.hidden)
+		{
+			uint64_t t = SDL_GetPerformanceCounter();
+			if (speed == 1.0 || t - last_present >= freq / FRAMERATE)
+			{
+				SDL::update(System::get_display_output(), Video::get_display_scanlines(), Video::get_background_color());
+				last_present = t;
+			}
+		}
+		Log::flush();
+
+		// Sleep until the next frame is due, or any event arrives
+		if (!has_quit)
+		{
+			uint64_t wait_ms = 0;
+			if (!running || Automation::paused())
+			{
+				wait_ms = 5;
+			}
+			else if (speed > 0)
+			{
+				uint64_t since = SDL_GetPerformanceCounter() - last_frame_ticks;
+				if (since < ticks_per_frame) wait_ms = (ticks_per_frame - since) * 1000 / freq;
+			}
+			if (wait_ms > 0) SDL_WaitEventTimeout(nullptr, (int)wait_ms);
 		}
 
 		SDL_Event e;
 		while (SDL_PollEvent(&e))
 		{
-			switch (e.type)
-			{
-			case SDL_QUIT:
-				has_quit = true;
-				break;
-			case SDL_KEYDOWN:
-				Input::set_key_state(e.key.keysym.sym, true);
-				break;
-			case SDL_KEYUP:
-			{
-				SDL_Keycode keycode = e.key.keysym.sym;
-				switch (keycode)
-				{
-				case SDLK_F1:
-					if (Input::is_mouse_plugged())
-					{
-						if (SDL::is_mouse_captured())
-						{
-							SDL::capture_mouse(false);
-							Input::set_mouse_button_state(SDL_BUTTON_LEFT, false);
-							Input::set_mouse_button_state(SDL_BUTTON_RIGHT, false);
-						}
-						Input::set_mouse_plugged(false);
-						Log::info("Gamepad plugged in");
-					}
-					break;
-				case SDLK_F2:
-					if (!Input::is_mouse_plugged())
-					{
-						Input::set_mouse_plugged(true);
-						Log::info("Loopy mouse plugged in, click window to capture");
-					}
-					else if (SDL::is_mouse_captured())
-					{
-						SDL::capture_mouse(false);
-						Input::set_mouse_button_state(SDL_BUTTON_LEFT, false);
-						Input::set_mouse_button_state(SDL_BUTTON_RIGHT, false);
-					}
-					break;
-				case SDLK_F10:
-					if (config.cart.is_loaded())
-					{
-						// Raw video buffer
-						imagew::save_image_16bpp(
-							config.emulator.screenshot_image_type, get_full_screenshot_path(config),
-							Video::DISPLAY_WIDTH, Video::get_display_scanlines(), Video::get_display_output()
-						);
-						if (args.correct_aspect_ratio)
-						{
-							// Export both scaled and original, let user decide which they want
-							SDL::screenshot(config.emulator.screenshot_image_type, get_full_screenshot_path(config));
-						}
-					}
-					break;
-				case SDLK_F11:
-					SDL::toggle_fullscreen();
-					break;
-				case SDLK_F12:
-					if (config.cart.is_loaded())
-					{
-						Log::info("Rebooting Loopy...");
-						System::shutdown(config);
-						System::initialize(config);
-						last_frame_ticks = INT_MAX;
-					}
-					break;
-				case SDLK_MINUS:
-					if (!SDL::screen.is_fullscreen())
-					{
-						SDL::change_window_scale(-1);
-					}
-					break;
-				case SDLK_EQUALS:
-					if (!SDL::screen.is_fullscreen())
-					{
-						SDL::change_window_scale(1);
-					}
-					break;
-				case SDLK_ESCAPE:
-					if (SDL::screen.is_fullscreen())
-					{
-						SDL::toggle_fullscreen();
-					}
-					else
-					{
-						has_quit = true;
-					}
-					break;
-				default:
-					Input::set_key_state(keycode, false);
-					break;
-				}
-				break;
-			}
-			case SDL_CONTROLLERBUTTONDOWN:
-				// Quit on select+start
-				if (SDL::controller && SDL_GameControllerGetButton(SDL::controller, SDL_CONTROLLER_BUTTON_START) &&
-					SDL_GameControllerGetButton(SDL::controller, SDL_CONTROLLER_BUTTON_BACK))
-				{
-					has_quit = true;
-					break;
-				}
-				Input::set_controller_state(e.cbutton.button, true);
-				break;
-			case SDL_CONTROLLERBUTTONUP:
-				Input::set_controller_state(e.cbutton.button, false);
-				break;
-			case SDL_WINDOWEVENT:
-				switch (e.window.event)
-				{
-				case SDL_WINDOWEVENT_FOCUS_GAINED:
-					if (!args.run_in_background)
-					{
-						Sound::set_mute(false);
-						is_paused = false;
-					}
-					break;
-				case SDL_WINDOWEVENT_FOCUS_LOST:
-					if (!args.run_in_background)
-					{
-						Sound::set_mute(true);
-						is_paused = true;
-					}
-					if (SDL::is_mouse_captured())
-					{
-						SDL::capture_mouse(false);
-						Input::set_mouse_button_state(SDL_BUTTON_LEFT, false);
-						Input::set_mouse_button_state(SDL_BUTTON_RIGHT, false);
-					}
-					break;
-				}
-				break;
-			case SDL_MOUSEBUTTONDOWN:
-				if (SDL::is_mouse_captured())
-				{
-					Input::set_mouse_button_state(e.button.button, true);
-				}
-				else if (Input::is_mouse_plugged())
-				{
-					SDL::capture_mouse(true);
-				}
-				break;
-			case SDL_MOUSEBUTTONUP:
-				if (SDL::is_mouse_captured())
-				{
-					Input::set_mouse_button_state(e.button.button, false);
-				}
-				break;
-			case SDL_MOUSEMOTION:
-				if (SDL::is_mouse_captured())
-				{
-					Input::move_mouse(e.motion.xrel, -e.motion.yrel);
-				}
-				break;
-			case SDL_CONTROLLERDEVICEADDED:
-				if (!SDL::controller)
-				{
-					Log::info("New controller added.");
-					SDL::open_first_controller();
-				}
-				break;
-			case SDL_CONTROLLERDEVICEREMOVED:
-				// Only react to current device being removed
-				if (SDL::controller &&
-					e.cdevice.which == SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(SDL::controller)))
-				{
-					Log::info("Controller removed, using next available one.");
-					SDL_GameControllerClose(SDL::controller);
-					SDL::open_first_controller();
-				}
-				break;
-			case SDL_DROPFILE:
-				System::shutdown(config);
-
-				std::string path = e.drop.file;
-				if (load_cart(config, path))
-				{
-					Log::info("Loaded %s...", path.c_str());
-
-					fs::path rom_path = fs::absolute(config.cart.rom_path);
-					if (rom_path.has_parent_path())
-					{
-						config.emulator.image_save_directory = rom_path.parent_path();
-					}
-
-					System::initialize(config);
-					// So you can tell that MSE is running even before you click into it
-					is_paused = false;
-					last_frame_ticks = INT_MAX;
-				}
-
-				SDL_free(e.drop.file);
-				break;
-			}
+			handle_event(e);
 		}
 	}
 
-	System::shutdown(config);
+	Automation::shutdown();
+	DebugTools::shutdown();
+	if (config.cart.is_loaded()) System::shutdown(config);
 	SDL::shutdown();
-
-	return 0;
+	Log::flush();
+	Log::close_file();
+	return exit_code;
 }

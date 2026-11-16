@@ -34,6 +34,9 @@ struct CPU
 
 	bool in_delay_slot;
 	bool in_nointerrupt_slot;
+
+	//Address of the instruction being executed (for watches and diagnostics)
+	uint32_t executing_addr;
 };
 
 extern CPU sh2;

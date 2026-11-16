@@ -60,6 +60,11 @@ void shutdown();
 void start_frame();
 bool check_frame_end();
 int get_display_scanlines();
+int get_vcount();
+// Emulated frames per emulated second (a little over 60)
+double get_frame_rate();
+// Report palette and OAM writes that land on a line being drawn
+void set_raster_warnings(bool enabled);
 uint16_t get_background_color();
 uint16_t* get_display_output();
 

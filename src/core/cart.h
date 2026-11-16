@@ -12,4 +12,7 @@ void shutdown(Config::CartInfo& info);
 
 void sram_commit_check();
 
+//Dev automation: when disabled, SRAM is never written back to the .sav file (default: enabled)
+void set_sram_write_enabled(bool enabled);
+
 }

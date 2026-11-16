@@ -1,23 +1,37 @@
-NOTE: This is a work in progress and will be added to the readme when done.
+# Building LoopyMSE-Enhanced
 
-## Building - Windows
+You need CMake 3.30 or newer and a C++17 compiler. SDL2 and SDL2_image are
+fetched and built by CMake itself; there are no other dependencies.
 
-Get MSYS2 and install the MINGW64 toolchain, or add it to an existing installation with `pacman -S mingw-w64-x86_64-toolchain`
+```
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target install
+```
 
-Install SDL2 and Boost: `pacman -S mingw-w64-x86_64-SDL2 mingw-w64-x86_64-boost`
+The finished program, its DLLs or libraries, and the default `loopymse.ini`
+end up in `build/dist`. Put the BIOS files (`bios.bin` and `soundbios.bin`)
+beside the program, or name them with `--bios` and `--sound-bios`.
 
-For ease of building, recommended to install [VS Code](https://code.visualstudio.com/), and use the [CMake Tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cmake-tools) extension.
+## Windows
 
-In your CMake Tools [Additional Compiler Search Dirs](vscode://settings/cmake.additionalCompilerSearchDirs), ensure your (root) MSYS2 folder is included, e.g. `C:/msys64`.
+Either compiler works:
 
-Locate the CMake extension panel, and under *Configure*, select the pencil icon, or use the `CMake: Select a Kit` command. There should be an entry for mingw64, e.g. `GCC 14.2.0 x86_64-w64-mingw32 (mingw64)`. Select that. CMake should configure itself then. If this succeeds, look one line down in *Configure* or use `CMake: Select Variant` command select the `Release` configuration.
+- **Visual Studio 2022** (Community is enough): open a Developer PowerShell
+  and run the two commands above; CMake picks the Visual Studio generator.
+  The program is a console program, so its log appears in the terminal you
+  start it from.
+- **MSYS2 MinGW64**: install the toolchain with
+  `pacman -S mingw-w64-x86_64-toolchain mingw-w64-x86_64-cmake`, then add
+  `-G "MinGW Makefiles"` to the configure command.
 
-You should be able to make builds with the `CMake: Build` command or the build keyboard shortcut. To make a distributable build, use `CMake: Install` instead. The end product will reside in `build/dist`.
+## macOS
 
-## Building - MacOS
+Install the Xcode command line tools and CMake (for example
+`brew install cmake`), then run the commands above. The app bundle ends up in
+`build/dist/LoopyMSE.app`.
 
-To get prerequisites, use [Homebrew](https://brew.sh) to install SDL2 and Boost: `brew install boost sdl2`. If homebrew is correctly set up, the C++ build tools should all be available.
+## Linux
 
-(NOTE: is it necessary to have cmake installed, or will VSCode install its own version?)
-
-Follow the steps above to setup builds in VS Code, choosing the (TODO) kit.
+Install a compiler, CMake and SDL2's build dependencies (on Debian and
+Ubuntu: `sudo apt install build-essential cmake libx11-dev libxext-dev
+libasound2-dev libpulse-dev`), then run the commands above.

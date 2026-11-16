@@ -290,7 +290,8 @@ bool print_return_hook(uint32_t addr)
 
 void initialize(Config::SystemInfo& config)
 {
-	output_dir = config.emulator.image_save_directory;
+	output_dir = config.emulator.print_directory.empty() ? config.emulator.image_save_directory
+														 : config.emulator.print_directory;
 	output_type = config.emulator.printer_image_type;
 	print_aspect_ratio = config.emulator.printer_correct_aspect_ratio ? imagew::LOOPY_SEAL_ASPECT : 0;
 

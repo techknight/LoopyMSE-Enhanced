@@ -12,6 +12,7 @@
 #include "core/sh2/peripherals/sh2_pfc.h"
 #include "core/sh2/peripherals/sh2_serial.h"
 #include "core/sh2/peripherals/sh2_timers.h"
+#include "core/sh2/sh2_cost.h"
 
 namespace SH2::OCPM
 {
@@ -32,6 +33,13 @@ constexpr static int PFC_START = 0xFC0;
 constexpr static int PFC_END = 0xFF8;
 
 static uint8_t oram[0x400];
+
+// The bus state controller's registers (BCR, WCR1-3, DCR, PCR, RCR, RTCSR,
+// RTCNT, RTCOR): kept as written, so a program reads back what the BIOS set.
+// Their timing effects are only modelled by the console timing model.
+constexpr static int BSC_START = 0xFA0;
+constexpr static int BSC_END = 0xFB4;
+static uint16_t bsc[(BSC_END - BSC_START) / 2];
 
 uint8_t io_read8(uint32_t addr)
 {
@@ -77,6 +85,11 @@ uint16_t io_read16(uint32_t addr)
 	if (addr >= PFC_START && addr < PFC_END)
 	{
 		return PFC::read16(addr);
+	}
+
+	if (addr >= BSC_START && addr < BSC_END)
+	{
+		return bsc[(addr - BSC_START) / 2];
 	}
 
 	switch (addr)
@@ -141,6 +154,17 @@ void io_write16(uint32_t addr, uint16_t value)
 	if (addr >= PFC_START && addr < PFC_END)
 	{
 		PFC::write16(addr, value);
+		return;
+	}
+
+	if (addr >= BSC_START && addr < BSC_END)
+	{
+		bsc[(addr - BSC_START) / 2] = value;
+		if (addr == 0xFA6)
+		{
+			// WCR3: one state plus A6LW + 1 long waits a cartridge access.
+			Cost::wcr3_written(2.0 + ((value >> 11) & 3));
+		}
 		return;
 	}
 

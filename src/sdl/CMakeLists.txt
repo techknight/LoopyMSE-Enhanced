@@ -1,4 +1,6 @@
 add_executable (LoopyMSE
+    "autodrive.h"
+    "autodrive.cpp"
     "config.h"
     "options.h"
     "options.cpp"
@@ -8,10 +10,10 @@ add_executable (LoopyMSE
 )
 
 target_link_libraries (LoopyMSE PRIVATE
+    automation
     core
     SDL2
     SDL2_image
-    Boost::program_options
 )
 
 target_compile_definitions (LoopyMSE PRIVATE
@@ -23,7 +25,9 @@ target_compile_definitions (LoopyMSE PRIVATE
 
 if (WIN32)
     target_sources (LoopyMSE PRIVATE "windows.rc")
-    target_link_options (LoopyMSE PRIVATE -mwindows -static-libgcc -static-libstdc++)
+    if (MINGW)
+        target_link_options (LoopyMSE PRIVATE -mwindows -static-libgcc -static-libstdc++)
+    endif ()
 elseif (APPLE)
     set (CMAKE_OSX_DEPLOYMENT_TARGET "15.0" CACHE STRING "" FORCE)
     set (CMAKE_MACOSX_RPATH ON)

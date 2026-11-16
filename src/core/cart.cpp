@@ -10,15 +10,23 @@ struct State
 {
 	std::vector<uint8_t> rom;
 	std::vector<uint8_t> sram;
+	std::vector<uint8_t> sram_on_disk;  // what the .sav file holds, to write only changes
 	std::string sram_file_path;
 };
 
 static State state;
+static bool sram_write_enabled = true;
 
 static void commit_sram()
 {
+	if (!sram_write_enabled || state.sram_file_path.empty()) return;
+	if (state.sram == state.sram_on_disk) return;
 	std::ofstream file(state.sram_file_path, std::ios::binary);
 	file.write((char*)state.sram.data(), state.sram.size());
+	if (file.good())
+	{
+		state.sram_on_disk = state.sram;
+	}
 }
 
 void initialize(Config::CartInfo& info)
@@ -41,6 +49,9 @@ void initialize(Config::CartInfo& info)
 		size_t new_size = (state.sram.size() + 0xFFF) & ~0xFFF;
 		state.sram.resize(new_size, 0xFF);
 	}
+	//Treat the loaded contents as already saved; a missing file is written
+	//on the first commit
+	state.sram_on_disk = info.sram_from_file ? state.sram : std::vector<uint8_t>();
 
 	Memory::map_sh2_pagetable(state.rom.data(), ROM_START, state.rom.size());
 	Memory::map_sh2_pagetable(state.sram.data(), SRAM_START, state.sram.size());
@@ -66,6 +77,11 @@ void sram_commit_check()
 
 	frame_count = 0;
 	commit_sram();
+}
+
+void set_sram_write_enabled(bool enabled)
+{
+	sram_write_enabled = enabled;
 }
 
 }

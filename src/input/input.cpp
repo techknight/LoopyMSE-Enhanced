@@ -15,6 +15,9 @@ static std::unordered_map<int, MouseButton> mouse_bindings;
 //re-initialization (reboot, cart load).
 static bool mouse_plugged;
 
+//Automation owns the pad and mouse; input from the person is ignored.
+static bool user_blocked = false;
+
 void initialize()
 {
 	//Indicate the gamepad (or mouse, when plugged) is connected
@@ -28,6 +31,7 @@ void shutdown()
 
 void set_controller_state(int button, bool pressed)
 {
+	if (user_blocked) return;
 	auto binding = controller_bindings.find(button);
 	if (binding == controller_bindings.end())
 	{
@@ -40,6 +44,7 @@ void set_controller_state(int button, bool pressed)
 
 void set_key_state(int key, bool pressed)
 {
+	if (user_blocked) return;
 	auto binding = key_bindings.find(key);
 	if (binding == key_bindings.end())
 	{
@@ -52,6 +57,7 @@ void set_key_state(int key, bool pressed)
 
 void set_mouse_button_state(int button, bool pressed)
 {
+	if (user_blocked) return;
 	auto binding = mouse_bindings.find(button);
 	if (binding == mouse_bindings.end())
 	{
@@ -63,6 +69,33 @@ void set_mouse_button_state(int button, bool pressed)
 }
 
 void move_mouse(int delta_x, int delta_y)
+{
+	if (user_blocked) return;
+	LoopyIO::update_mouse_position(delta_x, delta_y);
+}
+
+void set_user_input_blocked(bool blocked)
+{
+	user_blocked = blocked;
+}
+
+bool is_user_input_blocked()
+{
+	return user_blocked;
+}
+
+void inject_pad(int buttons)
+{
+	LoopyIO::update_pad(ALL_PAD_BUTTONS, false);
+	LoopyIO::update_pad(buttons & ALL_PAD_BUTTONS, true);
+}
+
+void inject_mouse_buttons(int buttons, bool pressed)
+{
+	LoopyIO::update_mouse_buttons(buttons & (MOUSE_L | MOUSE_R), pressed);
+}
+
+void inject_mouse_move(int delta_x, int delta_y)
 {
 	LoopyIO::update_mouse_position(delta_x, delta_y);
 }

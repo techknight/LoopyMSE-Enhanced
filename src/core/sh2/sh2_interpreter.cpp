@@ -64,7 +64,7 @@ static uint32_t get_control_reg(int index)
 	case 2:
 		return sh2.vbr;
 	default:
-		assert(0);
+		Log::unimplemented("[SH2] read of control register %d", index);
 		return 0;
 	}
 }
@@ -84,7 +84,7 @@ static void set_control_reg(int index, uint32_t value)
 		sh2.vbr = value;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[SH2] write of control register %d", index);
 	}
 }
 
@@ -100,7 +100,7 @@ static uint32_t get_system_reg(int index)
 	case 2:
 		return sh2.pr;
 	default:
-		assert(0);
+		Log::unimplemented("[SH2] read of system register %d", index);
 		return 0;
 	}
 }
@@ -120,7 +120,7 @@ static void set_system_reg(int index, uint32_t value)
 		sh2.pr = value;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[SH2] write of system register %d", index);
 	}
 }
 
@@ -690,7 +690,7 @@ static void macw(uint16_t instr)
 	int32_t value2 = (int32_t)(int16_t)Bus::read16(sh2.gpr[reg2]);
 
 	bool saturate = GET_S();
-	assert(!saturate);
+	if (saturate) Log::unimplemented("[SH2] MAC.W with saturation (S bit set)");
 
 	//TODO: is this correct?
 	int32_t tmp = value1 * value2;
@@ -1605,8 +1605,7 @@ void run(uint16_t instr, uint32_t src_addr)
 	}
 	else
 	{
-		Log::error("[SH2] unrecognized instr %04X at %08X", instr, src_addr);
-		assert(0);
+		Log::unimplemented("[SH2] illegal instruction %04X at %08X", instr, src_addr);
 	}
 }
 

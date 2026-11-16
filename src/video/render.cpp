@@ -1,6 +1,7 @@
 #include "video/render.h"
 
 #include <common/bswp.h>
+#include <log/log.h>
 
 #include <algorithm>
 #include <cassert>
@@ -84,7 +85,8 @@ static int get_bg_tile_size(int index)
 		tile_size = 64;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Render] BG%d tile size %d", index, tile_size);
+		tile_size = 8;
 	}
 	return tile_size;
 }
@@ -110,7 +112,9 @@ static void get_tilemap_info(TilemapInfo& info)
 		info.height = 32;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Render] BG map size %d", vdp.bg_ctrl.map_size);
+		info.width = 32;
+		info.height = 32;
 	}
 
 	info.data_start = (info.width * info.height) << 1;
@@ -274,7 +278,8 @@ static void draw_bitmap(int index, int y)
 		vram_height = 512;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Render] bitmap mode %d (BM_CTRL)", vdp.bitmap_ctrl);
+		return;
 	}
 	uint8_t subpalette_bits = ((vdp.bitmap_palsel >> ((3 - index) * 4)) & 0xF) << 4;
 	bool use_color_buffer = (regs->buffer_ctrl & 0x100) != 0;
@@ -437,7 +442,9 @@ static void draw_obj(int index, int screen_y)
 			obj_height = 32;
 			break;
 		default:
-			assert(0);
+			Log::unimplemented("[Render] OBJ size %d", tile_size);
+			obj_width = 8;
+			obj_height = 8;
 		}
 
 		int start_y = (descriptor >> 16) & 0xFF;
@@ -709,7 +716,7 @@ static void display_capture(int y)
 		memcpy(vdp.capture_buffer, vdp.screens[0], DISPLAY_WIDTH * sizeof(uint8_t));
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Render] capture format %d", vdp.capture_ctrl.format);
 	}
 }
 
@@ -746,7 +753,7 @@ void draw_scanline(int y)
 		draw_screen_overlay(y, false);
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Render] display mode %d", vdp.dispmode);
 	}
 
 	if (vdp.capture_enable && y == vdp.capture_ctrl.scanline)

@@ -40,6 +40,7 @@ constexpr static int MUTE_FADE_MS = 20;
 
 // Audio synthesis parameters in loopysound.h.
 
+void set_output_enabled(bool enabled);
 void initialize(std::vector<uint8_t>& sound_rom);
 void shutdown();
 

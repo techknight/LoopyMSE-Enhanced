@@ -27,4 +27,7 @@ void set_controller_plugged(bool plugged_pad, bool plugged_mouse);
 void update_print_temp();
 void update_sensors();
 
+// Log every register access with the line and the program counter.
+void set_trace(bool enabled);
+
 }

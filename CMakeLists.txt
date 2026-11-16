@@ -5,21 +5,15 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 set (CMAKE_CXX_EXTENSIONS OFF)
 
 project (LoopyMSE LANGUAGES C CXX ASM)
-set (PROJECT_VERSION 0.5.3)
-set (PROJECT_DESCRIPTION "Loopy My Seal Emulator")
-set (PROJECT_HOMEPAGE_URL "https://github.com/LoopyMSE/LoopyMSE")
+set (PROJECT_VERSION 0.5.3-enhanced.1)
+set (PROJECT_DESCRIPTION "LoopyMSE-Enhanced")
+set (PROJECT_HOMEPAGE_URL "https://github.com/techknight/LoopyMSE-Enhanced")
 set (PROJECT_ORG "LoopyMSE")
 
 string (REPLACE "/DNDEBUG" "" CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
 
 ### DEPENDENCIES
 include (FetchContent)
-
-# libboost used for program_options
-# currently binaries are fetched via packager + statically linked in at build time,
-# as we have had no issues with this so far and Boost is a large monolithic thing to build, and we don't need to customize anything
-set (Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
-find_package (Boost REQUIRED COMPONENTS program_options)
 
 # SDL2, SDL2_image
 # Due to package managers pulling shenanigans like replacing SDL2 with SDL2-compat,

@@ -3,6 +3,7 @@
 #include <cassert>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/sh2_bus.h"
+#include "core/sh2/sh2_cost.h"
 
 namespace SH2::OCPM::DMAC
 {
@@ -71,7 +72,7 @@ static bool in_dma_state;
 void Channel::start_transfer()
 {
 	//TODO: time these transfers instead of doing them all at once?
-	assert(!ctrl.irq_enable);
+	if (ctrl.irq_enable) Log::unimplemented("[DMAC] transfer-end interrupt (CHCR bit 2)");
 
 	int src_step = 0;
 	switch (ctrl.src_step)
@@ -97,6 +98,9 @@ void Channel::start_transfer()
 
 	src_step <<= ctrl.transfer_16bit;
 	dst_step <<= ctrl.transfer_16bit;
+
+	// Console timing: the transfer stalls the CPU by its measured rate.
+	uint32_t cost_src = src_addr, cost_dst = dst_addr, cost_units = transfer_size;
 
 	//TODO: speed this up by doing memcpy if both addresses are in Memory
 	if (ctrl.transfer_16bit)
@@ -128,6 +132,11 @@ void Channel::start_transfer()
 			transfer_size--;
 		}
 		in_dma_state = false;
+	}
+
+	if (SH2::Cost::enabled)
+	{
+		SH2::Cost::dma(cost_src, cost_dst, ctrl.transfer_16bit ? 2 : 1, cost_units - transfer_size);
 	}
 
 	if (!transfer_size)
@@ -166,12 +175,20 @@ uint16_t read16(uint32_t addr)
 	Channel* chan = &state.chan[addr >> 4];
 	switch (reg)
 	{
+	case 0x00:
+		return chan->src_addr >> 16;
+	case 0x02:
+		return chan->src_addr & 0xFFFF;
+	case 0x04:
+		return chan->dst_addr >> 16;
+	case 0x06:
+		return chan->dst_addr & 0xFFFF;
 	case 0x0A:
 		return chan->transfer_size & 0xFFFF;
 	case 0x0E:
 		return chan->get_ctrl();
 	default:
-		assert(0);
+		Log::unimplemented("[DMAC] read16 %02X", addr);
 		return 0;
 	}
 }
@@ -190,6 +207,18 @@ void write16(uint32_t addr, uint16_t value)
 	Channel* chan = &state.chan[addr >> 4];
 	switch (reg)
 	{
+	case 0x00:
+		chan->src_addr = (chan->src_addr & 0x0000FFFF) | ((uint32_t)value << 16);
+		break;
+	case 0x02:
+		chan->src_addr = (chan->src_addr & 0xFFFF0000) | value;
+		break;
+	case 0x04:
+		chan->dst_addr = (chan->dst_addr & 0x0000FFFF) | ((uint32_t)value << 16);
+		break;
+	case 0x06:
+		chan->dst_addr = (chan->dst_addr & 0xFFFF0000) | value;
+		break;
 	case 0x0A:
 		chan->transfer_size = value;
 		if (!chan->transfer_size)
@@ -202,7 +231,7 @@ void write16(uint32_t addr, uint16_t value)
 		check_activations();
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[DMAC] write16 %02X: %04X", addr, value);
 	}
 }
 
@@ -220,8 +249,13 @@ void write32(uint32_t addr, uint32_t value)
 	case 0x04:
 		chan->dst_addr = value;
 		break;
+	case 0x08:
+	case 0x0C:
+		// TCR and CHCR are the low halves of these longwords
+		write16(addr + 2, value & 0xFFFF);
+		break;
 	default:
-		assert(0);
+		Log::unimplemented("[DMAC] write32 %02X: %08X", addr, value);
 	}
 }
 
