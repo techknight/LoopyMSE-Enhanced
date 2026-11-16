@@ -1,0 +1,10 @@
+# LF line endings everywhere: in the repository and in every working copy,
+# whatever core.autocrlf says on the machine.
+* text=auto eol=lf
+
+# Binary files
+*.ico binary
+*.icns binary
+*.png binary
+*.bin binary
+*.sav binary
