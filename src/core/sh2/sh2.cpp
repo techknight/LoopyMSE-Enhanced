@@ -180,7 +180,7 @@ void console_cost_enable(bool on)
 
 bool profile_write(const std::string& path, const std::string& note)
 {
-	FILE* f = fopen(path.c_str(), "w");
+	FILE* f = fopen(path.c_str(), "wb");  //LF line endings on every platform
 	if (!f) return false;
 	fprintf(f, "# cycles total %llu other %llu\n", (unsigned long long)prof_total, (unsigned long long)prof_other);
 	if (!note.empty()) fprintf(f, "# %s\n", note.c_str());

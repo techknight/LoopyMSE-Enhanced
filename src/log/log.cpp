@@ -60,7 +60,8 @@ void use_stderr(bool enable)
 bool open_file(const std::string& path)
 {
 	close_file();
-	file = fopen(path.c_str(), "w");
+	//Binary mode: LF line endings on every platform
+	file = fopen(path.c_str(), "wb");
 	return file != nullptr;
 }
 

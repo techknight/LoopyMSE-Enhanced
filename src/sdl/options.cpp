@@ -498,7 +498,7 @@ void print_settings(Registry& r)
 
 bool write_ini(Registry& r, const std::string& path)
 {
-	std::ofstream file(path);
+	std::ofstream file(path, std::ios::binary);  //LF line endings on every platform
 	if (!file.is_open()) return false;
 	std::string section;
 	for (const auto& s : r.settings)

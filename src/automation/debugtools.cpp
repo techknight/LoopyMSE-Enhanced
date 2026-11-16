@@ -84,7 +84,7 @@ bool configure(const Settings& s, std::string& error)
 	for (int port = 0; port < 2; port++)
 	{
 		if (s.serial_log[port].empty()) continue;
-		serial_files[port] = fopen(s.serial_log[port].c_str(), serial_timed ? "w" : "wb");
+		serial_files[port] = fopen(s.serial_log[port].c_str(), "wb");
 		if (!serial_files[port])
 		{
 			error = "cannot write serial log " + s.serial_log[port];
@@ -98,7 +98,7 @@ bool configure(const Settings& s, std::string& error)
 	{
 		if (!s.watch_log.empty())
 		{
-			watch_file = fopen(s.watch_log.c_str(), "w");
+			watch_file = fopen(s.watch_log.c_str(), "wb");
 			if (!watch_file)
 			{
 				error = "cannot write watch log " + s.watch_log;
