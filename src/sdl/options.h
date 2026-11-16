@@ -79,6 +79,14 @@ struct Args
 	uint64_t shot_every = 0;
 	std::vector<uint64_t> shot_at;
 
+	// [record]
+	std::string record_video;
+	std::string record_audio;
+	std::string record_frames;
+	int record_scale = 3;
+	int record_quality = 16;
+	std::string record_ffmpeg = "ffmpeg";
+
 	// [profile]
 	std::string profile_file;
 	uint64_t profile_from = 0;

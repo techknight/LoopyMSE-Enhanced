@@ -17,6 +17,7 @@ Game support notes:
 
 #pragma once
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -41,6 +42,14 @@ constexpr static int MUTE_FADE_MS = 20;
 // Audio synthesis parameters in loopysound.h.
 
 void set_output_enabled(bool enabled);
+
+// Capture for recording: when a sink is set (before initialize), the sound is
+// rendered on the emulation thread, locked to emulated time, and every block
+// of stereo samples (interleaved floats, `frames` pairs) is passed to it.
+using CaptureFunc = std::function<void(const float* samples, int frames)>;
+void set_capture(CaptureFunc sink);
+int get_capture_sample_rate();
+
 void initialize(std::vector<uint8_t>& sound_rom);
 void shutdown();
 

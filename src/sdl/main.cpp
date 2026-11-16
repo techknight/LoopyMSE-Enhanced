@@ -30,6 +30,7 @@
 #include "autodrive.h"
 #include "config.h"
 #include "options.h"
+#include "recorder.h"
 
 #define PRESCALE_FACTOR 4
 #define MAX_WINDOW_INT_SCALE 10
@@ -637,6 +638,7 @@ void run_frame()
 	Autodrive::run_frame();
 	frame++;
 	Log::set_frame(frame);
+	Recorder::video_frame(frame, Video::get_display_output(), Video::get_display_scanlines());
 
 	if (!args.profile_file.empty() && frame == args.profile_to)
 	{
@@ -994,6 +996,20 @@ int main(int argc, char** argv)
 	}
 	LoopyIO::set_trace(args.trace_io);
 	Video::set_raster_warnings(args.raster_warnings);
+
+	Recorder::Settings rec;
+	if (!args.record_video.empty()) rec.video = output_file(args.record_video).string();
+	if (!args.record_audio.empty()) rec.audio = output_file(args.record_audio).string();
+	if (!args.record_frames.empty()) rec.frames_dir = output_file(args.record_frames).string();
+	rec.scale = args.record_scale;
+	rec.quality = args.record_quality;
+	rec.ffmpeg = args.record_ffmpeg;
+	std::string record_error;
+	if (!Recorder::start(rec, record_error))
+	{
+		Log::error("%s", record_error.c_str());
+		return Automation::EXIT_USAGE;
+	}
 	if (!args.script.empty())
 	{
 		std::string error;
@@ -1116,6 +1132,7 @@ int main(int argc, char** argv)
 	Automation::shutdown();
 	DebugTools::shutdown();
 	if (config.cart.is_loaded()) System::shutdown(config);
+	Recorder::stop();
 	SDL::shutdown();
 	Log::flush();
 	Log::close_file();

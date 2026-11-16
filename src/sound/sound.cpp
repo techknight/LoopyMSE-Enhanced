@@ -48,6 +48,16 @@ static float volume_level;	// Automatically managed by mute
 // as with sound.
 static bool output_enabled = true;
 
+// Capture (recording): the engine renders on the emulation thread, a block at
+// every time reference, so the samples follow emulated time exactly whatever
+// the speed. The blocks go to the capture sink and, if there is an audio
+// device, are queued to it instead of being pulled by its callback.
+static CaptureFunc capture_sink;
+static std::vector<float> capture_buffer;
+static double capture_owed = 0;
+// Queued audio beyond this is dropped (faster than real time)
+constexpr static int MAX_QUEUED_MS = 200;
+
 static void buffer_callback(float* buffer, uint32_t count);
 
 /* SDL-specific code start */
@@ -100,7 +110,7 @@ static bool sdl_audio_initialize()
 	format_desired.format = AUDIO_F32SYS;
 	format_desired.channels = 2;
 	format_desired.samples = TARGET_BUFFER_SIZE;
-	format_desired.callback = sdl_audio_callback;
+	format_desired.callback = capture_sink ? NULL : sdl_audio_callback;
 	format_desired.userdata = NULL;
 	assert(sizeof(float) == 4);
 
@@ -133,22 +143,46 @@ static void sdl_audio_shutdown()
 /* SDL-specific code end */
 
 static void timeref(uint64_t param, int cycles_late);
+static void update_volume_level();
 
 void set_output_enabled(bool enabled)
 {
 	output_enabled = enabled;
 }
 
+void set_capture(CaptureFunc sink)
+{
+	capture_sink = sink;
+}
+
+int get_capture_sample_rate()
+{
+	return TARGET_SAMPLE_RATE;
+}
+
 void initialize(std::vector<uint8_t>& sound_rom)
 {
 	if (!sound_rom.empty())
 	{
+		bool have_device = false;
 		if (output_enabled)
 		{
-			if (!sdl_audio_initialize())
+			have_device = sdl_audio_initialize();
+			if (!have_device && !capture_sink)
 			{
 				return;
 			}
+		}
+		if (capture_sink)
+		{
+			// Rendered a time reference at a time: keep the MIDI look-ahead short
+			sample_rate = TARGET_SAMPLE_RATE;
+			buffer_size = 2 * TARGET_SAMPLE_RATE / TIMEREF_FREQUENCY;
+			capture_owed = 0;
+			sound_engine = std::make_unique<LoopySound::LoopySound>(sound_rom, (float)sample_rate, buffer_size);
+		}
+		else if (have_device)
+		{
 			sound_engine = std::make_unique<LoopySound::LoopySound>(sound_rom, (float)sample_rate, buffer_size);
 		}
 
@@ -233,7 +267,38 @@ static void timeref(uint64_t param, int cycles_late)
 	timeref_ev = Timing::add_event(timeref_func, timeref_cycles, 0, Timing::CPU_TIMER);
 
 	constexpr static float timeref_period = 1.f / TIMEREF_FREQUENCY;
-	if (sound_engine) sound_engine->time_reference(timeref_period);
+	if (!sound_engine) return;
+	sound_engine->time_reference(timeref_period);
+
+	if (capture_sink)
+	{
+		// The samples of this time reference period
+		capture_owed += (double)sample_rate / TIMEREF_FREQUENCY;
+		int count = (int)capture_owed;
+		capture_owed -= count;
+		capture_buffer.resize(count * 2);
+		for (int i = 0; i < count; i++)
+		{
+			sound_engine->gen_sample(&capture_buffer[i * 2]);
+		}
+		capture_sink(capture_buffer.data(), count);
+
+		if (audio_device)
+		{
+			uint32_t queued = SDL_GetQueuedAudioSize(audio_device);
+			uint32_t limit = (uint32_t)(sample_rate * 2 * sizeof(float) * MAX_QUEUED_MS / 1000);
+			if (queued < limit)
+			{
+				for (int i = 0; i < count; i++)
+				{
+					update_volume_level();
+					capture_buffer[i * 2] *= volume_level;
+					capture_buffer[i * 2 + 1] *= volume_level;
+				}
+				SDL_QueueAudio(audio_device, capture_buffer.data(), (uint32_t)(capture_buffer.size() * sizeof(float)));
+			}
+		}
+	}
 }
 
 static void update_volume_level()
