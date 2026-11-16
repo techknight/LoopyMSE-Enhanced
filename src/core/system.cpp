@@ -98,7 +98,7 @@ namespace
 {
 
 const char STATE_MAGIC[16] = "LOOPYMSE-STATE";
-constexpr uint32_t STATE_FORMAT = 1;
+constexpr uint32_t STATE_FORMAT = 2;
 
 uint32_t cart_id(const Config::CartInfo& cart)
 {

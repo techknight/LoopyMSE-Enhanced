@@ -118,12 +118,20 @@ void Channel::start_transfer()
 	// Console timing: the transfer stalls the CPU by its measured rate.
 	uint32_t cost_src = src_addr, cost_dst = dst_addr, cost_units = transfer_size;
 
+	// A request from a timer compare match or the external pin moves one unit;
+	// the others hold their request until the transfer is done or they drop it
+	uint32_t units_left = UINT32_MAX;
+	if ((ctrl.mode >= (int)DREQ::IMIA0 && ctrl.mode <= (int)DREQ::IMIA3) || ctrl.mode == (int)DREQ::External)
+	{
+		units_left = 1;
+	}
+
 	//TODO: speed this up by doing memcpy if both addresses are in Memory
 	if (ctrl.transfer_16bit)
 	{
 		Log::debug("[DMAC] start 16bit transfer src:%08X dst:%08X size:%08X sstep:%d dstep:%d", src_addr, dst_addr, transfer_size, src_step, dst_step);
 		in_dma_state = true;
-		while (transfer_size && state.dreqs[ctrl.mode])
+		while (transfer_size && state.dreqs[ctrl.mode] && units_left--)
 		{
 			uint16_t value = SH2::Bus::read16(src_addr);
 			SH2::Bus::write16(dst_addr, value);
@@ -138,7 +146,7 @@ void Channel::start_transfer()
 	{
 		Log::debug("[DMAC] start 8bit transfer src:%08X dst:%08X size:%08X sstep:%d dstep:%d", src_addr, dst_addr, transfer_size, src_step, dst_step);
 		in_dma_state = true;
-		while (transfer_size && state.dreqs[ctrl.mode])
+		while (transfer_size && state.dreqs[ctrl.mode] && units_left--)
 		{
 			uint8_t value = SH2::Bus::read8(src_addr);
 			SH2::Bus::write8(dst_addr, value);
@@ -294,6 +302,13 @@ void send_dreq(DREQ dreq)
 
 void clear_dreq(DREQ dreq)
 {
+	state.dreqs[(int)dreq] = false;
+}
+
+void pulse_dreq(DREQ dreq)
+{
+	state.dreqs[(int)dreq] = true;
+	check_activations();
 	state.dreqs[(int)dreq] = false;
 }
 

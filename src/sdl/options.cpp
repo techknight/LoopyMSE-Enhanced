@@ -341,6 +341,10 @@ void register_settings(Registry& r, Args& a)
 
 	r.add_bool("cart.sram_write", a.sram_write, "Write the cartridge save (SRAM) back to its .sav file");
 	r.add_string("cart.sram", a.sram_path, "Save file to use instead of <rom name>.sav");
+	r.add_choice(
+		"cart.det_wiring", a.det_wiring, {"auto", "vcc", "pb1"},
+		"Cartridge detect line: tied high (vcc), or to PB1 like boards with the Magical Shop unlock; auto knows the retail boards"
+	);
 
 	r.add_string(
 		"paths.output", a.output_dir,

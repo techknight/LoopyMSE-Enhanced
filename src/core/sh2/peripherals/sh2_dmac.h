@@ -38,6 +38,9 @@ void initialize();
 
 void send_dreq(DREQ dreq);
 void clear_dreq(DREQ dreq);
+// An edge request (timer compare match, the external pin): one unit for each
+// channel waiting on it
+void pulse_dreq(DREQ dreq);
 
 uint16_t read16(uint32_t addr);
 

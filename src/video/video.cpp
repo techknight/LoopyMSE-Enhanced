@@ -22,13 +22,56 @@
 namespace Video
 {
 
-static Timing::FuncHandle vcount_func, hsync_func;
-static Timing::EventHandle vcount_ev, hsync_ev;
+static Timing::FuncHandle vcount_func, hsync_func, irq0_func;
+static Timing::EventHandle vcount_ev, hsync_ev, irq0_ev;
 
 VDP vdp;
 
+//NTSC raster timing, measured on hardware: the VDP runs at 21.477272 MHz, a
+//line is 1365 VDP cycles and a frame 263 lines (59.826 frames a second). The
+//active part of a line, HCOUNT 0 to 0x101 at 4 VDP cycles a step, takes 1029
+//cycles; then HCOUNT jumps to 0x1AC for the blanking, and VCOUNT counts up.
 constexpr static int LINES_PER_FRAME = 263;
-constexpr static int CYCLES_PER_LINE = (Timing::F_CPU / 60) / LINES_PER_FRAME;
+constexpr static int64_t VDP_CLOCK = 21477272;
+constexpr static int VDP_CYCLES_PER_LINE = 1365;
+constexpr static int VDP_ACTIVE_CYCLES = 1029;
+//2684659 VDP cycles are exactly 2000000 CPU cycles (16 MHz / 21.477272 MHz)
+constexpr static int64_t VDP_REBASE = 2684659;
+constexpr static int64_t CPU_REBASE = 2000000;
+
+static int64_t vdp_to_cpu(int64_t vdp_cycles)
+{
+	return vdp_cycles * CPU_REBASE / VDP_REBASE;
+}
+
+//VDP cycles since the current line started
+static int64_t cycle_in_line()
+{
+	int64_t cpu = Timing::get_timestamp(Timing::CPU_TIMER) - vdp.base_cpu;
+	return cpu * VDP_REBASE / CPU_REBASE - vdp.line_start;
+}
+
+static Timing::EventHandle schedule_vdp(Timing::FuncHandle func, int64_t vdp_cycle, uint64_t param = 0)
+{
+	int64_t delay = vdp.base_cpu + vdp_to_cpu(vdp_cycle) - Timing::get_timestamp(Timing::CPU_TIMER);
+	if (delay < 0) delay = 0;
+	return Timing::add_event(func, Timing::convert_cpu(delay), param, Timing::CPU_TIMER);
+}
+
+//The line position where HCOUNT shows a value, or -1 if it never does
+static int hcount_to_cycle(int hcount)
+{
+	if (hcount <= 0x101) return hcount * 4;
+	if (hcount >= 0x1AC && hcount <= 0x1FF) return VDP_ACTIVE_CYCLES + (hcount - 0x1AC) * 4;
+	return -1;
+}
+
+static uint16_t current_hcount()
+{
+	int64_t v = cycle_in_line();
+	if (v < VDP_ACTIVE_CYCLES) return (uint16_t)std::min<int64_t>(v / 4, 0x101);
+	return (uint16_t)std::min<int64_t>(0x1AC + (v - VDP_ACTIVE_CYCLES) / 4, 0x1FF);
+}
 
 // Palette and OAM writes while a line is being drawn put dots on the picture
 // of a real console; the emulator draws them clean. With raster warnings on,
@@ -47,7 +90,7 @@ static RasterReport raster;
 static inline void note_raster_write(bool is_palette)
 {
 	if (!raster_warn) return;
-	if (vdp.vcount >= vdp.visible_scanlines || (vdp.hcount & 0x100)) return;
+	if (vdp.vcount >= vdp.visible_scanlines || cycle_in_line() >= VDP_ACTIVE_CYCLES) return;
 	if (raster.first_line < 0)
 	{
 		raster.first_line = vdp.vcount;
@@ -98,6 +141,7 @@ void save_state(State::Writer& w)
 	w.bytes(vdp.display_output.get(), sizeof(uint16_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT);
 	w.put(vcount_ev);
 	w.put(hsync_ev);
+	w.put(irq0_ev);
 }
 
 void load_state(State::Reader& r)
@@ -112,13 +156,14 @@ void load_state(State::Reader& r)
 	r.bytes(vdp.display_output.get(), sizeof(uint16_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT);
 	r.get(vcount_ev);
 	r.get(hsync_ev);
+	r.get(irq0_ev);
 	//The controller scan mode lives in LoopyIO too; keep them in step
 	LoopyIO::set_controller_scan_mode(vdp.mode.pad_scan, vdp.mode.mouse_scan);
 }
 
 double get_frame_rate()
 {
-	return (double)Timing::F_CPU / (CYCLES_PER_LINE * LINES_PER_FRAME);
+	return (double)VDP_CLOCK / (VDP_CYCLES_PER_LINE * LINES_PER_FRAME);
 }
 
 struct DumpHeader
@@ -197,30 +242,42 @@ void dump_all_bmps()
 	dump_bmp(display_name, vdp.display_output);
 }
 
-static void start_hsync(uint64_t param, int cycles_late)
+static void pulse_irq(SH2::OCPM::INTC::IRQ irq_id)
 {
-	vdp.hcount |= 0x100;
-	//IRQ0 is triggered every line and uses hcmp/vcmp
-	//For now hcmp is not emulated but we just assume it happens at the same time as HSYNC
+	SH2::OCPM::INTC::assert_irq(irq_id, 0);
+	SH2::OCPM::INTC::deassert_irq(irq_id);
+}
+
+//IRQ0: the position compare interrupt, when HCOUNT reaches HCMP (and VCOUNT
+//equals VCMP, if that is enabled too)
+static void irq0_event(uint64_t param, int cycles_late)
+{
 	if (vdp.cmp_irq_ctrl.irq0_enable && vdp.cmp_irq_ctrl.irq0_enable2)
 	{
 		if (!vdp.cmp_irq_ctrl.use_vcmp || vdp.vcount == vdp.irq0_vcmp)
 		{
-			auto irq_id = SH2::OCPM::INTC::IRQ::IRQ0;
-			SH2::OCPM::INTC::assert_irq(irq_id, 0);
-			SH2::OCPM::INTC::deassert_irq(irq_id);
+			pulse_irq(SH2::OCPM::INTC::IRQ::IRQ0);
 		}
 	}
-	//IRQ1 is triggered on visible lines when in HSYNC mode
-	if (vdp.sync_irq_ctrl.irq1_enable && vdp.sync_irq_ctrl.irq1_source == 1)
+}
+
+//IRQ2: a scanline capture is ready (source 0) or an ADC conversion is done
+//(source 1), when INTERRUPT_CTRL enables it (bits 0, 3 and 6) for that source
+//(bit 4)
+static void irq2_source_done(int source)
+{
+	uint16_t ctrl = vdp.irq_ctrl_raw;
+	if ((ctrl & 0x49) == 0x49 && ((ctrl >> 4) & 1) == source)
 	{
-		if (vdp.vcount < vdp.visible_scanlines)
-		{
-			auto irq_id = SH2::OCPM::INTC::IRQ::IRQ1;
-			SH2::OCPM::INTC::assert_irq(irq_id, 0);
-			SH2::OCPM::INTC::deassert_irq(irq_id);
-		}
+		pulse_irq(SH2::OCPM::INTC::IRQ::IRQ2);
 	}
+}
+
+//The raster DMA signal (on the CPU's PA13/IRQ1/DREQ0 pin) falls when the
+//active picture ends: once a frame, or after every visible line
+static void raster_signal()
+{
+	pulse_irq(SH2::OCPM::INTC::IRQ::IRQ1);
 }
 
 static void vsync_start()
@@ -235,35 +292,39 @@ static void vsync_start()
 	//NMI is triggered on VSYNC
 	if (vdp.cmp_irq_ctrl.nmi_enable)
 	{
-		//TODO: is there a cleaner way to do this?
-		auto irq_id = SH2::OCPM::INTC::IRQ::NMI;
-		SH2::OCPM::INTC::assert_irq(irq_id, 0);
-		SH2::OCPM::INTC::deassert_irq(irq_id);
+		pulse_irq(SH2::OCPM::INTC::IRQ::NMI);
 	}
 
-	//IRQ1 is triggered on VSYNC when in VSYNC mode
+	//The raster DMA signal, frame mode
 	if (vdp.sync_irq_ctrl.irq1_enable && (vdp.sync_irq_ctrl.irq1_source == 0))
 	{
-		auto irq_id = SH2::OCPM::INTC::IRQ::IRQ1;
-		SH2::OCPM::INTC::assert_irq(irq_id, 0);
-		SH2::OCPM::INTC::deassert_irq(irq_id);
+		raster_signal();
 	}
-
-	//dump_bmp("output_display", vdp.display_output);
-	//dump_all_bmps();
-	//dump_for_serial();
 }
 
-static void inc_vcount(uint64_t param, int cycles_late)
+//The end of a line's active pixels (HCOUNT jumps from 0x101 to 0x1AC): the
+//line is drawn, VCOUNT counts up, and the blanking interrupts happen. Register
+//writes made in the blanking that follows land on the next line.
+static void active_end(uint64_t param, int cycles_late)
 {
-	//Leave HSYNC
-	vdp.hcount &= ~0x100;
-	if (vdp.vcount < vdp.visible_scanlines)
+	bool visible = vdp.vcount < vdp.visible_scanlines;
+	if (visible)
 	{
+		bool capture_pending = vdp.capture_enable;
 		Renderer::draw_scanline(vdp.vcount);
+		if (capture_pending && !vdp.capture_enable)
+		{
+			irq2_source_done(0);
+		}
 	}
 
 	vdp.vcount++;
+
+	//The raster DMA signal, line mode: after every visible line
+	if (visible && vdp.sync_irq_ctrl.irq1_enable && vdp.sync_irq_ctrl.irq1_source == 1)
+	{
+		raster_signal();
+	}
 
 	//Once we go past the visible region, enter VSYNC
 	if (vdp.vcount == vdp.visible_scanlines)
@@ -289,15 +350,35 @@ static void inc_vcount(uint64_t param, int cycles_late)
 		}
 	}
 
-	constexpr static int CYCLES_PER_FRAME = Timing::F_CPU / 60;
-	constexpr static int CYCLES_PER_LINE = CYCLES_PER_FRAME / LINES_PER_FRAME;
-	constexpr static int CYCLES_UNTIL_HSYNC = (CYCLES_PER_LINE * 256.0f) / 341.25f;
+}
 
-	Timing::UnitCycle scanline_cycles = Timing::convert_cpu(CYCLES_PER_LINE - cycles_late);
-	vcount_ev = Timing::add_event(vcount_func, scanline_cycles, 0, Timing::CPU_TIMER);
+//The start of a line: schedule its events on the VDP clock
+static void line_begin(uint64_t param, int cycles_late)
+{
+	if (param)
+	{
+		//Called by the event: this line starts where the last one ended
+		vdp.line_start += VDP_CYCLES_PER_LINE;
+		if (vdp.line_start >= VDP_REBASE)
+		{
+			//Keep the numbers small; VDP_REBASE VDP cycles are exactly
+			//CPU_REBASE CPU cycles
+			vdp.line_start -= VDP_REBASE;
+			vdp.base_cpu += CPU_REBASE;
+		}
+	}
 
-	Timing::UnitCycle hsync_cycles = Timing::convert_cpu(CYCLES_UNTIL_HSYNC - cycles_late);
-	hsync_ev = Timing::add_event(hsync_func, hsync_cycles, 0, Timing::CPU_TIMER);
+	vcount_ev = schedule_vdp(vcount_func, vdp.line_start + VDP_ACTIVE_CYCLES);
+	hsync_ev = schedule_vdp(hsync_func, vdp.line_start + VDP_CYCLES_PER_LINE, 1);
+
+	if (vdp.cmp_irq_ctrl.irq0_enable && vdp.cmp_irq_ctrl.irq0_enable2)
+	{
+		int offset = hcount_to_cycle(vdp.irq0_hcmp);
+		if (offset >= 0)
+		{
+			irq0_ev = schedule_vdp(irq0_func, vdp.line_start + offset);
+		}
+	}
 }
 
 static void dump_serial_region(std::ofstream& dump, uint8_t* mem, uint32_t addr, uint32_t length)
@@ -345,11 +426,14 @@ void initialize()
 	Memory::map_sh2_pagetable(vdp.bitmap, BITMAP_VRAM_START + BITMAP_VRAM_SIZE, BITMAP_VRAM_SIZE);
 	Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
 
-	vcount_func = Timing::register_func("Video::inc_vcount", inc_vcount);
-	hsync_func = Timing::register_func("Video::start_hsync", start_hsync);
+	vcount_func = Timing::register_func("Video::active_end", active_end);
+	hsync_func = Timing::register_func("Video::line_begin", line_begin);
+	irq0_func = Timing::register_func("Video::irq0", irq0_event);
 
-	//Kickstart the VCOUNT event
-	inc_vcount(0, 0);
+	//Start the raster at the beginning of line 0
+	vdp.base_cpu = Timing::get_timestamp(Timing::CPU_TIMER);
+	vdp.line_start = 0;
+	line_begin(0, 0);
 }
 
 void shutdown()
@@ -658,8 +742,7 @@ uint16_t ctrl_read16(uint32_t addr)
 		return result;
 	}
 	case 0x002:
-		//FIXME: This only reflects HSYNC status, it doesn't actually return the horizontal counter
-		return vdp.hcount;
+		return current_hcount();
 	case 0x004:
 		return vdp.vcount;
 	default:
@@ -705,6 +788,7 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 		if (value & 0x02)
 		{
 			LoopyIO::update_print_temp();
+			irq2_source_done(1);
 		}
 
 		if (value & 0x04)

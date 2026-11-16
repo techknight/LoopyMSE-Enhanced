@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <tuple>
 
+#include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_intc.h"
 #include "core/timing.h"
 
@@ -154,6 +155,12 @@ static void intr_event(uint64_t param, int cycles_late)
 		if (timer->ctrl.clear_mode == 0x1)
 		{
 			clear_counter = true;
+		}
+		//Compare match A on ITU0-3 is also a DMA request (the BIOS paces its
+		//print bursts this way)
+		if (timer->id < 4)
+		{
+			DMAC::pulse_dreq((DMAC::DREQ)((int)DMAC::DREQ::IMIA0 + timer->id));
 		}
 	}
 

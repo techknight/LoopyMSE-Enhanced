@@ -13,7 +13,8 @@ LoopyMSE game.bin --script walkthrough.txt --hidden --fast --out run1
 
 ## Frames
 
-Everything is counted in emulated frames (60 a second) from power-on.
+Everything is counted in emulated frames (59.826 a second, the console's
+own rate) from power-on.
 **Frame F** is the moment F frames have been emulated:
 
 - a command due at frame F runs before the next frame is emulated, so input

@@ -19,9 +19,9 @@ its meaning); `LoopyMSE --help` lists the command-line shortcuts.
   byte-identical frames, sound, logs and savestates, at any speed, hidden or
   not. Use `--no-ini --no-sram-write` so neither a local ini file nor a
   leftover save changes the result.
-- **Frame-exact.** Time is counted in emulated frames from power-on (about
-  60.05 per emulated second). Wall-clock time means nothing; never sleep and
-  hope.
+- **Frame-exact.** Time is counted in emulated frames from power-on (59.826
+  per emulated second, the console's NTSC rate). Wall-clock time means
+  nothing; never sleep and hope.
 - **Every run ends with an exit code** that says how it ended (below).
   Always check it.
 

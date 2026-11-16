@@ -43,6 +43,7 @@ struct Args
 	// [cart]
 	bool sram_write = true;
 	std::string sram_path;  // empty = <rom name>.sav beside the ROM, or in paths.output
+	std::string det_wiring = "auto";  // auto | vcc | pb1
 
 	// [paths]
 	std::string output_dir;

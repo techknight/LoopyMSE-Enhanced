@@ -20,6 +20,18 @@ struct GpioState
 
 static GpioState gpio;
 
+//How the cartridge is wired to the ports (a property of the board, not state):
+//its detect line DET (PA8) is tied high, or on some boards to PB1 (the "Magical
+//Shop unlock"), and its pull-ups hold some port B inputs high.
+static bool det_on_pb1 = false;
+static uint16_t pb_pullups = (1 << 3) | (1 << 1);
+
+void set_cart_wiring(bool det_pb1, uint16_t pullups)
+{
+	det_on_pb1 = det_pb1;
+	pb_pullups = pullups;
+}
+
 void save_state(State::Writer& w)
 {
 	w.section("pfc");
@@ -37,16 +49,21 @@ uint16_t read_gpio_inputs(int port)
 	if (port == 0)
 	{
 		// Port A
-		constexpr int pa8_cart_present = 1;  //We don't run without a cartridge so this is always high
+		//PA8 is the cartridge's DET line: high, or the level of PB1 on boards
+		//that tie it there (the program driving PB1 low then sees PA8 low too)
+		int pa8_det = 1;
+		if (det_on_pb1)
+		{
+			bool pb1_output = gpio.direction[1] & (1 << 1);
+			pa8_det = pb1_output ? (gpio.output[1] >> 1) & 1 : (pb_pullups >> 1) & 1;
+		}
 		constexpr int pa11_unk = 0;  //Tied hard low on all known boards, BIOS copies to an unknown VDP option
-		return (pa11_unk << 11) | (pa8_cart_present << 8);
+		return (pa11_unk << 11) | (pa8_det << 8);
 	}
 	else if (port == 1)
 	{
-		// Port B
-		constexpr int pb1_unk = 1;  //Pulled high in most cartridges
-		constexpr int pb3_unk = 1;  //Pulled high in most cartridges
-		return (pb3_unk << 3) | (pb1_unk << 1);
+		// Port B: the inputs the cartridge pulls up
+		return pb_pullups;
 	}
 	return 0;
 }

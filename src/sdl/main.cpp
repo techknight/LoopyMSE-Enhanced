@@ -5,6 +5,7 @@
 #include <core/cart.h>
 #include <core/config.h>
 #include <core/loopy_io.h>
+#include <core/sh2/peripherals/sh2_pfc.h>
 #include <core/sh2/sh2.h>
 #include <core/sh2/sh2_bus.h>
 #include <core/sh2/sh2_cost.h>
@@ -374,6 +375,32 @@ bool is_mouse_cart(const std::vector<uint8_t>& rom)
 	return std::find(std::begin(MOUSE_CARTS), std::end(MOUSE_CARTS), sum) != std::end(MOUSE_CARTS);
 }
 
+// How retail boards wire the cartridge port: the detect line (PA8) and the
+// pull-ups on port B. Most boards tie DET high and pull up PB1 and PB3.
+void apply_cart_wiring()
+{
+	constexpr uint16_t PB1 = 1 << 1, PB3 = 1 << 3, PB15 = 1 << 15;
+	bool det_pb1 = false;
+	uint16_t pullups = PB1 | PB3;
+	switch (header_checksum(config.cart.rom))
+	{
+	case 0x6E00CE71:  // Lupiton no Wonder Palette: DET on PB1 (Magical Shop unlock)
+		det_pb1 = true;
+		pullups = PB1 | PB3 | PB15;
+		break;
+	case 0xD90FE762:  // Wanwan Aijou Monogatari (Z544-1)
+	case 0x6A410BB2:  // Little Romance (Z544-1)
+	case 0x8373E9DD:  // Loopy Town no Oheya ga Hoshii! (Z544-1)
+		pullups = PB3;
+		break;
+	default:
+		break;
+	}
+	if (args.det_wiring == "vcc") det_pb1 = false;
+	else if (args.det_wiring == "pb1") det_pb1 = true;
+	SH2::OCPM::PFC::set_cart_wiring(det_pb1, pullups);
+}
+
 // Relative output files go into paths.output when it is set.
 fs::path output_file(const std::string& name)
 {
@@ -451,6 +478,7 @@ bool load_cart(const std::string& path)
 	//If the file was larger, then the vector size is clamped
 	config.cart.sram.resize(sram_size, 0xFF);
 	set_output_dirs_for(path);
+	apply_cart_wiring();
 	return true;
 }
 
@@ -1140,7 +1168,9 @@ int main(int argc, char** argv)
 	SDL::initialize(args, title_suffix);
 
 	const uint64_t freq = SDL_GetPerformanceFrequency();
-	constexpr int FRAMERATE = 60;  //TODO: get this from Video if it can be changed (e.g. for PAL mode)
+	//Real time is the Loopy's own frame rate (59.83 frames a second)
+	const double FRAMERATE = Video::get_frame_rate();
+	const uint64_t ticks_per_display_frame = (uint64_t)(freq / FRAMERATE);
 	constexpr uint64_t MAX_LAG_FRAMES = 5;
 	last_frame_ticks = SDL_GetPerformanceCounter();
 	uint64_t last_present = 0;
@@ -1188,7 +1218,7 @@ int main(int argc, char** argv)
 			}
 			run_frame();
 			emulated = true;
-			if (speed == 0 && SDL_GetPerformanceCounter() - now > freq / FRAMERATE) break;
+			if (speed == 0 && SDL_GetPerformanceCounter() - now > ticks_per_display_frame) break;
 		}
 		if (!emulated && !has_quit)
 		{
@@ -1199,7 +1229,7 @@ int main(int argc, char** argv)
 		if (emulated && config.cart.is_loaded() && !SDL::screen.hidden)
 		{
 			uint64_t t = SDL_GetPerformanceCounter();
-			if (speed == 1.0 || t - last_present >= freq / FRAMERATE)
+			if (speed == 1.0 || t - last_present >= ticks_per_display_frame)
 			{
 				SDL::update(System::get_display_output(), Video::get_display_scanlines(), Video::get_background_color());
 				last_present = t;

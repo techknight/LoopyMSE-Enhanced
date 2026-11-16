@@ -48,6 +48,33 @@ Based on LoopyMSE 0.5.3.
 - Unimplemented register accesses and modes are reported (and counted for
   strict mode) instead of asserting.
 
+### Hardware documentation (kasami's megadoc, the BIOS disassembly)
+- Raster timing as measured on an NTSC console: a line is 1365 VDP cycles
+  at 21.477272 MHz, a frame 263 lines, 59.826 frames a second (it was
+  60.06). The line is drawn and VCOUNT counts up as the active pixels end,
+  so register writes in the blanking land on the next line; HCOUNT reads the
+  real counter (0-0x101, then 0x1AC-0x1FF); IRQ0 fires at HCMP (and VCMP).
+- IRQ2 when a scanline capture or an ADC conversion is done; ITU compare
+  match A requests DMA (one unit each), as the BIOS's printing expects.
+- Tiles and objects larger than 8x8 wrap their characters within a row of
+  8, as the VDP does.
+- Cartridge wiring: the detect line follows PB1 on boards wired that way
+  (Lupiton no Wonder Palette: the "Magical Shop unlock"), and each board's
+  port B pull-ups; `cart.det_wiring` overrides it for homebrew.
+- Registers that read back what was written instead of being reported:
+  expansion timing, printer motor and head control (with their keys and the
+  printer enable), controller output, the ADC channel, PFC pin functions,
+  CASCR, VDP interrupt and capture control, BM_MEM_CTRL, sync calibration.
+- Blend modes 2, 3, 6 and 7; BM_CTRL aliases; capture mode 0.
+- Stores to ROM are ignored. Printing without a cassette or in an invalid
+  mode returns 2; mode 4 no longer hangs.
+
+### LoopyProbe
+- `probe/`: a homebrew ROM that measures, on a console, the points where
+  the documentation and the emulator disagree (frame period, raster
+  counters, memory costs, raster artifacts, the mouse), logs them to SRAM
+  and decodes them into a report; the emulator's results are included.
+
 ### Fixes
 - The save file is named by the last dot of the ROM's name: a ROM called
   `Game (v1.0).bin` used to save to `Game (v1.sav`.

@@ -174,8 +174,11 @@ static void draw_bg(int index, int screen_y)
 			tile_y = tile_size_mask - tile_y;
 		}
 
-		tile_index += tile_y & ~0x7;
-		tile_index += tile_x >> 3;
+		//Characters form a grid 8 wide: a tile larger than 8x8 takes its other
+		//characters by wrapping within its row of 8 (a 16x16 tile at index 7
+		//uses 7, 0, 15 and 8), and each character row down is 8 further on
+		tile_index = (tile_index & ~0x7) | ((tile_index + (tile_x >> 3)) & 0x7);
+		tile_index = (tile_index + (tile_y & ~0x7)) & 0x7FF;
 		uint32_t offs = (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
 
 		uint8_t tile_data;
@@ -497,9 +500,10 @@ static void draw_obj(int index, int screen_y)
 				tile_y = obj_height - 1 - tile_y;
 			}
 
+			//Wider objects wrap their characters within a row of 8, like tiles
 			int tile_index = descriptor >> 24;
+			tile_index = (tile_index & ~0x7) | ((tile_index + (tile_x >> 3)) & 0x7);
 			tile_index += tile_y & ~0x7;
-			tile_index += tile_x >> 3;
 			tile_index += vdp.obj_ctrl.tile_index_offs[index] << 8;
 			uint32_t offs = (tile_x & 0x7) + ((tile_y & 0x7) * 0x08) + (tile_index << 6);
 
