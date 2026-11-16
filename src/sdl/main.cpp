@@ -3,6 +3,9 @@
 #include <core/cart.h>
 #include <core/config.h>
 #include <core/system.h>
+#include <core/sh2/sh2.h>
+#include <core/sh2/sh2_bus.h>
+#include <core/sh2/sh2_cost.h>
 #include <input/input.h>
 #include <log/log.h>
 #include <sdl/imgwriter.h>
@@ -579,10 +582,13 @@ int main(int argc, char** argv)
 		fs::create_directories(screenshot_dir, ec);
 	}
 	uint64_t emulated_frames = 0;
+	uint32_t prof_watch_start = 0;
 
 	// Plug in the emulated mouse at startup if configured; F2/F1 switch between mouse and gamepad at runtime
 	Input::set_mouse_plugged(args.mouse || args.autodrive);
 	Autodrive::set_enabled(args.autodrive);
+	SH2::console_cost_enable(args.console_cost);
+	SH2::Cost::set_cart_rom_cycles(args.cost_cart_rom);
 
 	bool result = false;
 	for (const auto& path : search_paths(args.bios, args.cart))
@@ -690,6 +696,11 @@ int main(int argc, char** argv)
 					Input::set_scripted_pad(input_script_buttons);
 				}
 
+				if (!args.pc_profile.empty() && emulated_frames == args.pc_profile_from)
+				{
+					SH2::profile_enable(true);
+					if (args.pc_profile_watch) prof_watch_start = SH2::Bus::read32(args.pc_profile_watch);
+				}
 				System::run();
 				Autodrive::run_frame();
 				draw_frames--;
@@ -700,6 +711,26 @@ int main(int argc, char** argv)
 					automation_screenshot(screenshot_dir, emulated_frames);
 				}
 				emulated_frames++;
+
+				if (!args.pc_profile.empty() && emulated_frames == args.pc_profile_to)
+				{
+					SH2::profile_enable(false);
+					std::string note;
+					if (args.pc_profile_watch)
+					{
+						char buf[96];
+						snprintf(
+							buf, sizeof buf, "watch %08X start %u end %u fields %llu", (unsigned)args.pc_profile_watch,
+							(unsigned)prof_watch_start, (unsigned)SH2::Bus::read32(args.pc_profile_watch),
+							(unsigned long long)(args.pc_profile_to - args.pc_profile_from)
+						);
+						note = buf;
+					}
+					if (!SH2::profile_write(args.pc_profile, note))
+					{
+						Log::error("Could not write CPU profile %s", args.pc_profile.c_str());
+					}
+				}
 
 				if (args.exit_after_frames && emulated_frames >= args.exit_after_frames)
 				{

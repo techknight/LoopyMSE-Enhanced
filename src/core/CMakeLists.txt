@@ -15,6 +15,8 @@ add_library (core STATIC
 			 "sh2/sh2.h"
 			 "sh2/sh2_bus.cpp"
 			 "sh2/sh2_bus.h"
+			 "sh2/sh2_cost.cpp"
+			 "sh2/sh2_cost.h"
 			 "sh2/sh2_interpreter.cpp"
 			 "sh2/sh2_interpreter.h"
 			 "sh2/sh2_local.h"

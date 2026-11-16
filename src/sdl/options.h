@@ -38,10 +38,21 @@ struct Args
 	std::string input_script;
 	bool headless_fast = false;
 	bool no_sram_write = false;
+	// CPU profile: cycles per program address over emulated frames [from, to)
+	std::string pc_profile;
+	uint64_t pc_profile_from = 0;
+	uint64_t pc_profile_to = 0;
+	// Optional address whose 32-bit value is recorded at the start and end of
+	// the window (e.g. a game frame counter), 0 = none
+	uint32_t pc_profile_watch = 0;
+	// Console timing model for every instruction (core/sh2/sh2_cost.h)
+	bool console_cost = false;
+	double cost_cart_rom = 0.0;  // 0 = follow WCR3
 
 	bool automation_enabled() const
 	{
-		return screenshot_every || !screenshot_at.empty() || exit_after_frames || !input_script.empty() || headless_fast;
+		return screenshot_every || !screenshot_at.empty() || exit_after_frames || !input_script.empty() || headless_fast ||
+			   !pc_profile.empty();
 	}
 };
 

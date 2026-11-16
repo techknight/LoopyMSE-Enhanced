@@ -12,6 +12,7 @@
 #include "core/sh2/peripherals/sh2_pfc.h"
 #include "core/sh2/peripherals/sh2_serial.h"
 #include "core/sh2/peripherals/sh2_timers.h"
+#include "core/sh2/sh2_cost.h"
 
 namespace SH2::OCPM
 {
@@ -159,6 +160,11 @@ void io_write16(uint32_t addr, uint16_t value)
 	if (addr >= BSC_START && addr < BSC_END)
 	{
 		bsc[(addr - BSC_START) / 2] = value;
+		if (addr == 0xFA6)
+		{
+			// WCR3: one state plus A6LW + 1 long waits a cartridge access.
+			Cost::wcr3_written(2.0 + ((value >> 11) & 3));
+		}
 		return;
 	}
 

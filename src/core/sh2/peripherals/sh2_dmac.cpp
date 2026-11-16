@@ -3,6 +3,7 @@
 #include <cassert>
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/sh2_bus.h"
+#include "core/sh2/sh2_cost.h"
 
 namespace SH2::OCPM::DMAC
 {
@@ -98,6 +99,9 @@ void Channel::start_transfer()
 	src_step <<= ctrl.transfer_16bit;
 	dst_step <<= ctrl.transfer_16bit;
 
+	// Console timing: the transfer stalls the CPU by its measured rate.
+	uint32_t cost_src = src_addr, cost_dst = dst_addr, cost_units = transfer_size;
+
 	//TODO: speed this up by doing memcpy if both addresses are in Memory
 	if (ctrl.transfer_16bit)
 	{
@@ -128,6 +132,11 @@ void Channel::start_transfer()
 			transfer_size--;
 		}
 		in_dma_state = false;
+	}
+
+	if (SH2::Cost::enabled)
+	{
+		SH2::Cost::dma(cost_src, cost_dst, ctrl.transfer_16bit ? 2 : 1, cost_units - transfer_size);
 	}
 
 	if (!transfer_size)

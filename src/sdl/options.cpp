@@ -72,7 +72,13 @@ void parse_commandline(int argc, char** argv, Args& args)
 		("exit-after-frames", po::value<uint64_t>()->default_value(0), "Quit cleanly after N emulated frames (0 = never)")
 		("input-script", po::value<std::string>(), "Drive the gamepad from a frame-based script file (ignores real pad input)")
 		("headless-fast", "Run emulation as fast as possible (no frame throttling or vsync)")
-		("no-sram-write", "Never write SRAM back to the cartridge .sav file");
+		("no-sram-write", "Never write SRAM back to the cartridge .sav file")
+		("pc-profile", po::value<std::string>(), "Write CPU cycles per program address (cart ROM and RAM) to this file")
+		("pc-profile-from", po::value<uint64_t>()->default_value(0), "First emulated frame of the CPU profile")
+		("pc-profile-to", po::value<uint64_t>()->default_value(0), "Emulated frame the CPU profile stops and is written at")
+		("pc-profile-watch", po::value<std::string>(), "Hex address of a 32-bit value recorded at the profile's start and end")
+		("console-cost", "Charge every instruction what the console was measured to charge (data, literals, DMA, rows)")
+		("cost-cart-rom", po::value<double>()->default_value(0.0), "With --console-cost: cycles a cartridge ROM access takes, a what-if overriding WCR3 (0 = follow WCR3)");
 	commandline_opts.add(automation_opts);
 
 	po::variables_map vm;
@@ -110,6 +116,13 @@ void parse_commandline(int argc, char** argv, Args& args)
 	if (vm.count("input-script")) args.input_script = vm["input-script"].as<std::string>();
 	args.headless_fast = vm.count("headless-fast") > 0;
 	args.no_sram_write = vm.count("no-sram-write") > 0;
+	if (vm.count("pc-profile")) args.pc_profile = vm["pc-profile"].as<std::string>();
+	args.console_cost = vm.count("console-cost") > 0;
+	args.cost_cart_rom = vm["cost-cart-rom"].as<double>();
+	args.pc_profile_from = vm["pc-profile-from"].as<uint64_t>();
+	args.pc_profile_to = vm["pc-profile-to"].as<uint64_t>();
+	if (vm.count("pc-profile-watch"))
+		args.pc_profile_watch = (uint32_t)std::stoul(vm["pc-profile-watch"].as<std::string>(), nullptr, 16);
 	if (vm.count("screenshot-at"))
 	{
 		std::stringstream list(vm["screenshot-at"].as<std::string>());

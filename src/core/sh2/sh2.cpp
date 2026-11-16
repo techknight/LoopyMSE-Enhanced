@@ -1,6 +1,9 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdio>
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include <log/log.h>
 
@@ -13,6 +16,7 @@
 #include "core/sh2/peripherals/sh2_timers.h"
 #include "core/sh2/sh2.h"
 #include "core/sh2/sh2_bus.h"
+#include "core/sh2/sh2_cost.h"
 #include "core/sh2/sh2_interpreter.h"
 #include "core/sh2/sh2_local.h"
 #include "core/memory.h"
@@ -22,6 +26,12 @@ namespace SH2
 {
 
 CPU sh2;
+
+// Console timing model (sh2_cost.h): cycles the executed instructions have
+// cost and the pipeline has not yet waited out, and the instruction they are
+// charged to in the profile.
+static double cost_owed = 0.0;
+static uint32_t cost_addr = 0;
 
 static bool can_accept_exception(int vector_id, int prio)
 {
@@ -67,8 +77,17 @@ static bool handle_exception()
 		int prio = sh2.pending_exception_prio;
 		if (can_execute_exception(vector, prio))
 		{
-			raise_exception(vector);
-		
+			if (Cost::enabled)
+			{
+				Cost::begin(0x0009);
+				raise_exception(vector);
+				cost_owed += Cost::end() + Cost::EXCEPTION_STATES;
+			}
+			else
+			{
+				raise_exception(vector);
+			}
+
 			int new_imask = std::clamp(prio, 0, 15);
 		
 			//Interrupt mask should only be modified after the above function so that the original value can be pushed onto the stack
@@ -117,6 +136,10 @@ void initialize()
 	sh2.in_nointerrupt_slot = false;
 	sh2.fetch_cycles = 1;
 
+	cost_owed = 0.0;
+	cost_addr = 0;
+	Cost::reset();
+
 	Timing::register_timer(Timing::CPU_TIMER, &sh2.cycles_left, run);
 
 	//Set up on-chip peripheral modules after CPU is done
@@ -132,10 +155,59 @@ void shutdown()
 	sh2.hooks.clear();
 }
 
+static bool prof_on = false;
+static std::vector<uint32_t> prof_rom;
+static std::vector<uint32_t> prof_ram;
+static uint64_t prof_total = 0, prof_other = 0;
+
+void profile_enable(bool on)
+{
+	if (on && prof_rom.empty())
+	{
+		prof_rom.assign(0x200000, 0);
+		prof_ram.assign(0x40000, 0);
+	}
+	prof_on = on;
+	Cost::split_enable(on);
+}
+
+void console_cost_enable(bool on)
+{
+	Cost::enabled = on;
+}
+
+bool profile_write(const std::string& path, const std::string& note)
+{
+	FILE* f = fopen(path.c_str(), "w");
+	if (!f) return false;
+	fprintf(f, "# cycles total %llu other %llu\n", (unsigned long long)prof_total, (unsigned long long)prof_other);
+	if (!note.empty()) fprintf(f, "# %s\n", note.c_str());
+	if (Cost::enabled)
+	{
+		fprintf(f, "# console pricing (--console-cost)\n");
+		fputs(Cost::split_text().c_str(), f);
+	}
+	for (size_t i = 0; i < prof_rom.size(); i++)
+		if (prof_rom[i]) fprintf(f, "%08X %u\n", (unsigned)(0x0E000000 + 2 * i), prof_rom[i]);
+	for (size_t i = 0; i < prof_ram.size(); i++)
+		if (prof_ram[i]) fprintf(f, "%08X %u\n", (unsigned)(0x09000000 + 2 * i), prof_ram[i]);
+	fclose(f);
+	return true;
+}
+
+static inline void profile_tick(uint32_t a)
+{
+	prof_total++;
+	if ((a & 0xFFC00000u) == 0x0E000000u) prof_rom[(a & 0x3FFFFFu) >> 1]++;
+	else if ((a & 0xFFF80000u) == 0x09000000u) prof_ram[(a & 0x7FFFFu) >> 1]++;
+	else prof_other++;
+}
+
 void run()
 {
 	while (sh2.cycles_left)
 	{
+		if (prof_on) profile_tick(Cost::enabled ? cost_addr : sh2.pipeline_src_addr);
 		bool last_instruction_done = true; //TODO: wait on longer instructions like multiply
 
 		sh2.fetch_cycles -= 1;
@@ -183,9 +255,35 @@ void run()
 			//Execute whatever just came off the pipeline
 			bool was_delay_slot = sh2.in_delay_slot;
 			bool was_nointerrupt_slot = sh2.in_nointerrupt_slot;
-			if (execute_valid)
+			if (execute_valid && Cost::enabled)
+			{
+				// Console timing: fetch, then the data accesses in order (the
+				// open row moves with both), then the instruction's states.
+				bool onchip;
+				double fcost = Cost::fetch(execute_src_addr, &onchip);
+				Cost::begin(execute_instruction);
+				SH2::Interpreter::run(execute_instruction, execute_src_addr);
+				double data = Cost::end();
+				bool taken = !sh2.pipeline_valid;
+				bool delayed = sh2.in_delay_slot && !was_delay_slot;
+				cost_owed += Cost::price(execute_instruction, fcost, onchip, data, taken, delayed);
+				cost_addr = execute_src_addr;
+			}
+			else if (execute_valid)
 			{
 				SH2::Interpreter::run(execute_instruction, execute_src_addr);
+			}
+			if (Cost::enabled)
+			{
+				// The next issue waits out what this one cost. A pipeline
+				// refill still takes the loop's one cycle; the branch that
+				// caused it already paid for the refetch, so that cycle is
+				// taken back from the debt.
+				cost_owed += Cost::take_pending();
+				int wait = (int)cost_owed;
+				if (wait < 1) wait = 1;
+				cost_owed -= wait;
+				sh2.fetch_cycles = wait;
 			}
 			//This should probably be done more directly in the interpreter
 			if (was_delay_slot)
