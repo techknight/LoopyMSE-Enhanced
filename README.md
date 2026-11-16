@@ -33,6 +33,12 @@ Plus:
 - **One settings namespace.** Every ini key can be overridden on the command
   line as `--section.key=value`; `--help-config` lists them all.
 
+> When I was porting titles as part of the [Sticker Shock](https://loopystickershock.com) project, I
+> made several versions of LoopyMSE that implemented the above features in
+> various ways. LoopyMSE-Enhanced is an attempt to bring all of those
+> features that I relied on to other people, and to make it convenient
+> for players to try games that use the mouse. - Derek Q
+
 ## Builds
 
 Check the [Releases page](../../releases), or the rolling builds on
@@ -48,8 +54,7 @@ See the [Readme](assets/README.md) (included in builds) for playing, and
 LoopyMSE game.bin --script route.txt --hidden --fast --out results
 ```
 
-## Credits and Special Thanks
+## Credits
 * PSI - original [LoopyMSE](https://github.com/PSI-Rockin/LoopyMSE) project
 * kasami - reverse engineering, accuracy improvements, bug fixes, sound & printer implementation, BIOS dumping
 * partlyhuman - continued development, testing, automated builds, visual and quality-of-life improvements
-* UBCH discord server - documentation and archival, translations, moral support
