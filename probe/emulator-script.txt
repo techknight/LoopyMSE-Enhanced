@@ -8,63 +8,94 @@
 #       --out probe/results/emulator --frames 12000
 # The log ends up in probe/results/emulator/LoopyProbe.sav (and probe-sram.bin).
 #
-# 0x02000008 is the probe's phase byte, 0x0200000B its step (src/probe.h).
+# 0x02000008 is the probe's phase byte, 0x0200000B its step (0xA0: waiting
+# for a press), 0x02000034 the raster test on screen (src/probe.h).
 
 plug mouse
 # A finished log already in the save is kept unless a button is held for
-# three seconds: hold left until the run has started (harmless otherwise).
+# three seconds: hold left until the new run's title (harmless otherwise).
 mouse down left
 
-# phase 2: frame period (the run has started)
-wait-until mem.b 0x02000008 == 2 timeout 2400
+# phase 1: title (the run has started)
+wait-until mem.b 0x02000008 == 1 timeout 2400
 mouse up left
-wait-until mem.b 0x0200000B == 238 timeout 1200
-+60 shot 02-frame
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 01-title
+mouse click left
+
+# phase 2: frame period
+wait-until mem.b 0x02000008 == 2 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 02-frame
+mouse click left
 
 # phase 3: HCOUNT/VCOUNT, 240 lines
-wait-until mem.b 0x02000008 == 3 timeout 1200
-wait-until mem.b 0x0200000B == 238 timeout 1200
-+60 shot 03-hv240
+wait-until mem.b 0x02000008 == 3 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 03-hv240
+mouse click left
 
 # phase 4: HCOUNT/VCOUNT, 224 lines
-wait-until mem.b 0x02000008 == 4 timeout 1200
-wait-until mem.b 0x0200000B == 238 timeout 1200
-+60 shot 04-hv224
+wait-until mem.b 0x02000008 == 4 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 04-hv224
+mouse click left
 
 # phase 5: fetch and memory costs
-wait-until mem.b 0x02000008 == 5 timeout 1200
-wait-until mem.b 0x0200000B == 238 timeout 1200
-+60 shot 05-memory
+wait-until mem.b 0x02000008 == 5 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 05-memory
+mouse click left
 
 # phase 6: raster artifacts, seven tests
-wait-until mem.b 0x02000008 == 6 timeout 1200
-wait-until mem.b 0x0200000B == 1 timeout 900
-+150 shot 06-raster-1
-wait-until mem.b 0x0200000B == 2 timeout 900
-+150 shot 06-raster-2
-wait-until mem.b 0x0200000B == 3 timeout 900
-+150 shot 06-raster-3
-wait-until mem.b 0x0200000B == 4 timeout 900
-+150 shot 06-raster-4
-wait-until mem.b 0x0200000B == 5 timeout 900
-+150 shot 06-raster-5
-wait-until mem.b 0x0200000B == 6 timeout 900
-+150 shot 06-raster-6
-wait-until mem.b 0x0200000B == 7 timeout 900
-+150 shot 06-raster-7
+wait-until mem.b 0x02000008 == 6 timeout 600
+wait-until mem.b 0x02000034 == 1 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-1
+mouse click left
+wait-until mem.b 0x02000034 == 2 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-2
+mouse click left
+wait-until mem.b 0x02000034 == 3 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-3
+mouse click left
+wait-until mem.b 0x02000034 == 4 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-4
+mouse click left
+wait-until mem.b 0x02000034 == 5 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-5
+mouse click left
+wait-until mem.b 0x02000034 == 6 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-6
+mouse click left
+wait-until mem.b 0x02000034 == 7 timeout 600
+wait-until mem.b 0x0200000B == 0xA0 timeout 600
++10 shot 06-raster-7
+mouse click left
 
 # phase 10: mouse detection
-wait-until mem.b 0x02000008 == 10 timeout 900
+wait-until mem.b 0x02000008 == 10 timeout 600
 
 # phase 11: (a) hands off
 wait-until mem.b 0x02000008 == 11 timeout 1200
-+120 shot 11-prompt
-+180 shot 11-idle
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 11-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++240 shot 11-idle
 
 # phase 12: (b) circles
 wait-until mem.b 0x02000008 == 12 timeout 1200
-+120 shot 12-prompt
-+90 mouse move 24 0
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 12-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move 24 0
 +5 mouse move 17 17
 +5 mouse move 0 24
 +5 mouse move -17 17
@@ -99,22 +130,31 @@ shot 12-circles
 
 # phase 13: (c) left held
 wait-until mem.b 0x02000008 == 13 timeout 1200
-+120 shot 13-prompt
-+90 mouse down left
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 13-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse down left
 +60 shot 13-left
 
 # phase 14: (c) right held
 wait-until mem.b 0x02000008 == 14 timeout 1200
 mouse up left
-+120 shot 14-prompt
-+90 mouse down right
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 14-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse down right
 +60 shot 14-right
 
 # phase 15: (c) both held
 wait-until mem.b 0x02000008 == 15 timeout 1200
 mouse up right
-+120 shot 15-prompt
-+90 mouse down left
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 15-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse down left
 mouse down right
 +60 shot 15-both
 
@@ -122,8 +162,11 @@ mouse down right
 wait-until mem.b 0x02000008 == 16 timeout 1200
 mouse up left
 mouse up right
-+120 shot 16-prompt
-+90 mouse move 200 0
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 16-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move 200 0
 +5 mouse move 200 0
 +5 mouse move 200 0
 +5 mouse move 200 0
@@ -170,8 +213,11 @@ shot 16-fast-right
 
 # phase 17: (d) fast right, read once a second
 wait-until mem.b 0x02000008 == 17 timeout 1200
-+120 shot 17-prompt
-+90 mouse move 200 0
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 17-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move 200 0
 +5 mouse move 200 0
 +5 mouse move 200 0
 +5 mouse move 200 0
@@ -242,8 +288,11 @@ shot 17-overflow-right
 
 # phase 18: (d) fast left, read every frame
 wait-until mem.b 0x02000008 == 18 timeout 1200
-+120 shot 18-prompt
-+90 mouse move -200 0
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 18-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move -200 0
 +5 mouse move -200 0
 +5 mouse move -200 0
 +5 mouse move -200 0
@@ -290,8 +339,11 @@ shot 18-fast-left
 
 # phase 19: (d) fast left, read once a second
 wait-until mem.b 0x02000008 == 19 timeout 1200
-+120 shot 19-prompt
-+90 mouse move -200 0
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 19-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move -200 0
 +5 mouse move -200 0
 +5 mouse move -200 0
 +5 mouse move -200 0
@@ -362,8 +414,11 @@ shot 19-overflow-left
 
 # phase 20: (e) pad and mouse scan both armed, moving
 wait-until mem.b 0x02000008 == 20 timeout 1200
-+120 shot 20-prompt
-+90 mouse move 40 30
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 20-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move 40 30
 +5 mouse move 40 -30
 +5 mouse move -40 -30
 +5 mouse move -40 30
@@ -410,8 +465,11 @@ shot 20-scan-both
 
 # phase 21: (e) mouse scan alone, the same motion
 wait-until mem.b 0x02000008 == 21 timeout 1200
-+120 shot 21-prompt
-+90 mouse move 40 30
+wait-until mem.b 0x0200000B == 0xA0 timeout 1200
++10 shot 21-prompt
+mouse click left
+wait-until mem.b 0x0200000B == 0xA1 timeout 300
++150 mouse move 40 30
 +5 mouse move 40 -30
 +5 mouse move -40 -30
 +5 mouse move -40 30

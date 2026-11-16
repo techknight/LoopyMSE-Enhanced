@@ -3,20 +3,20 @@
 // Copyright (C) 2026 Derek Quenneville
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// The run, about two minutes, by itself (README.md has the phase table):
-// the frame period, HCOUNT/VCOUNT in both picture heights, fetch and memory
-// access costs, display artifacts from VDP accesses during the picture, and
-// the mouse. Every result goes to the SRAM log (log.c, decode_probe.py) and
-// most also to the screen. The same ROM in the emulator gives the
-// emulator's answers.
+// The run (README.md has the phase table): the frame period, HCOUNT/VCOUNT
+// in both picture heights, fetch and memory access costs, display artifacts
+// from VDP accesses during the picture, and the mouse. Every result goes to
+// the SRAM log (log.c, decode_probe.py) and most also to the screen. Nothing
+// that has to be read or done runs on a timer: before every step the probe
+// waits for a button to be pressed and let go (WaitPress, mouse.c), so the
+// run takes as long as whoever runs it. The same ROM in the emulator gives
+// the emulator's answers.
 //
 // A finished log is kept at the next boot, so a power cycle before the dump
 // loses nothing; holding a mouse button (or any pad button) for three
 // seconds on that screen erases it and runs again.
 
 #include "probe.h"
-
-#define BOOT_FRAMES 180
 
 static void Kept(void)
 {
@@ -44,42 +44,32 @@ static void Kept(void)
 	}
 }
 
+// The instructions, until a button is pressed and let go. A device plugged
+// in now is found by the next press (ButtonHeld reads the presence bits
+// every time).
 static void Boot(void)
 {
-	unsigned f;
-
 	WaitVblank();
 	LogPhase(PH_BOOT);
 	Title("");
 	Textf(TEXT_X, ROW(1), 2, C_YELLOW, "LOOPYPROBE");
 	Line(3, C_INK, "MEASURES THIS CONSOLE FOR THE");
-	Line(4, C_INK, "LOOPYMSE-ENHANCED EMULATOR. IT RUNS");
-	Line(5, C_INK, "BY ITSELF FOR ABOUT TWO MINUTES.");
-	Line(6, C_INK, "HANDS OFF THE MOUSE UNTIL ASKED;");
-	Line(7, C_INK, "PHOTOGRAPH THE SCREEN WHEN ASKED.");
+	Line(4, C_INK, "LOOPYMSE-ENHANCED EMULATOR.");
+	Line(5, C_INK, "PLUG IN THE XN-110 MOUSE NOW IF YOU");
+	Line(6, C_INK, "HAVE ONE (IN PLACE OF THE PAD).");
+	Line(7, C_INK, "IT WAITS FOR A BUTTON BEFORE EACH STEP.");
 	Line(8, C_GREY, "BUILT " __DATE__ " " __TIME__);
-	Line(14, C_INK, "AT THE END: TURN OFF, DUMP THE SAVE,");
-	Line(15, C_INK, "RUN DECODE_PROBE.PY ON IT.");
-	for (f = 0; f < BOOT_FRAMES; ++f) {
-		if (f % 60 == 0)
-			Line(17, C_YELLOW, "STARTING IN %u", (BOOT_FRAMES - f) / 60);
-		Present();
-		WaitVblank();
-	}
+	Line(14, C_INK, "PHOTOGRAPH EACH RASTER TEST (1-7).");
+	Line(15, C_INK, "AT THE END: TURN OFF, DUMP THE SAVE.");
+	Line(17, C_YELLOW, "PRESS AND RELEASE ANY BUTTON TO START");
+	WaitPress();
 }
 
-// A test's results stay up for two seconds, for a photograph.
+// A test's results stay up until a button is pressed and let go.
 static void Results(void)
 {
-	unsigned f;
-
-	LogStep(STEP_RESULTS);
-	for (f = 0; f < RESULT_FRAMES; ++f) {
-		if (f % 60 == 0)
-			Line(17, C_GREY, "NEXT TEST IN %u", (RESULT_FRAMES - f) / 60);
-		Present();
-		WaitVblank();
-	}
+	Line(17, C_YELLOW, "PRESS AND RELEASE A BUTTON TO GO ON");
+	WaitPress();
 }
 
 static void Done(void)
@@ -153,9 +143,8 @@ int main(void)
 		TestMouse();
 	} else {
 		Line(2, C_RED, "NO MOUSE: THE MOUSE TESTS ARE SKIPPED");
-		Present();
-		for (unsigned f = 0; f < 120; ++f)
-			WaitVblank();
+		Line(17, C_YELLOW, "PRESS AND RELEASE A BUTTON TO FINISH");
+		WaitPress();
 	}
 
 	Done();

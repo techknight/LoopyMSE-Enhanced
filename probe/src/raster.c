@@ -22,9 +22,11 @@
 // 15bpp) takes one line a frame while the accesses run: lines 60 (text and
 // backdrop), 120 (the bars), 190 (the BG band) and 211 (the sprites), four
 // frames each. Every capture is compared with the control's first capture
-// of the same line. If the capture sees nothing, that is the result
-// "capture did not see any"; each test also stays on screen for five
-// seconds, labelled, for a photograph.
+// of the same line (STEP_MEASURE, the test number in the header's test
+// byte). If the capture sees nothing, that is the result "capture did not
+// see any"; so each test then stays on screen, labelled and still
+// hammering, until a button is pressed and let go (STEP_PRESS), for a
+// photograph.
 
 #include <string.h>
 
@@ -37,7 +39,6 @@ ACC_DECL(rd);
 
 #define TESTS 7
 #define CAP_FRAMES 4
-#define SHOW_FRAMES 300
 
 static const uint8_t cap_lines[4] = { 60, 120, 190, 211 };
 static uint16_t control[4][256];
@@ -72,10 +73,12 @@ static void RunTest(int n)
 {
 	const struct Test *t = &tests[n - 1];
 	Access acc = Place(t->kind);
+	struct Press p = { 0 };
 	uint32_t value = 0, rounds = 0;
 	unsigned li, f, total_diff = 0;
 
-	LogStep((uint8_t) n);
+	LogStep(STEP_MEASURE);
+	LogTest((uint8_t) n);
 	Title("RASTER ARTIFACTS");
 	Textf(TEXT_X, ROW(1), 2, C_YELLOW, "TEST %d OF %d", n, TESTS);
 	Line(3, C_INK, "%s", t->name);
@@ -138,18 +141,19 @@ static void RunTest(int n)
 		}
 	}
 
+	// On show, the accesses still running, until a press and its release
+	// (checked in each vertical blank, between the frames of accesses).
 	Line(4, total_diff ? C_RED : C_GREEN, "CAPTURE: %u PIXELS DIFFER",
 	     total_diff);
-	for (f = 0; f < SHOW_FRAMES; ++f) {
-		if (f % 60 == 0) {
-			Line(15, C_YELLOW, "PHOTOGRAPH THE SCREEN NOW: %u S",
-			     (SHOW_FRAMES - f) / 60);
-			Present();
-		}
+	Line(14, C_YELLOW, "PHOTOGRAPH THE SCREEN NOW, THEN");
+	Line(15, C_YELLOW, "PRESS AND RELEASE A BUTTON");
+	Present();
+	while (!PressStep(&p)) {
 		WaitActive();
 		rounds = acc(t->target, &VDP.VCOUNT, value);
 		++vblanks;
 	}
+	LogStep(0);
 	LOG(R_RASTER_ACC, (uint8_t) n, (uint16_t) rounds, (uint16_t) t->kind,
 	    HI16(t->target), LO16(t->target));
 }

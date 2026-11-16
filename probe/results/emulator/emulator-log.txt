@@ -2,6 +2,7 @@
 [INFO] Located Sound BIOS at C:\Users\techk\AppData\Local\Temp\claude\d601d3e25c1be02b\3f79a2fc-c42c-47c9-8d27-f5310bcc97b2\scratchpad\roms\soundbios.bin
 [INFO] [Printer] skipping motor move...
 [INFO] [Printer] skipping motor move...
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\01-title.png
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\02-frame.png
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\03-hv240.png
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\04-hv224.png
@@ -37,5 +38,5 @@
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\21-scan-mouse.png
 [INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\99-done.png
 [INFO] [Automation] dumped sram (32768 bytes) to G:\LoopyMSE-Enhanced\probe\results\emulator\probe-sram.bin
-[INFO] Exiting at frame 7550: G:\LoopyMSE-Enhanced\probe\emulator-script.txt: exit
-[INFO] [Automation] G:\LoopyMSE-Enhanced\probe\emulator-script.txt finished at frame 7550
+[INFO] Exiting at frame 4554: G:\LoopyMSE-Enhanced\probe\emulator-script.txt: exit
+[INFO] [Automation] G:\LoopyMSE-Enhanced\probe\emulator-script.txt finished at frame 4554

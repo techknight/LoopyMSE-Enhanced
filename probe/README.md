@@ -44,13 +44,18 @@ How:
    bitmap. The VDP's scanline capture (mode 0, the displayed output, 15bpp)
    takes lines 60, 120, 190 and 211, four frames each, compared with the
    control. If the capture never differs, the answer is "capture did not see
-   any": each test also stays on screen for five seconds, labelled, for a
-   photograph.
-5. **Mouse.** On a clock (with the mouse plugged in there is no pad to
-   press): (a) hands off, (b)
+   any": so each test then stays on screen, labelled and still hammering,
+   until a button is pressed and released, for a photograph.
+5. **Mouse.** Each phase shows its instruction until a mouse button is
+   pressed and released, counts down three seconds (the time to start doing
+   what it says), then measures for a fixed window: (a) hands off, (b)
    circles, (c) left, right, both held, (d) fast right and left, read every
    frame (calibration) and then once a second (overflow), (e) moving with
    the pad and mouse scans both armed, then with the mouse scan alone.
+
+Nothing that has to be read or done runs on a timer: before every step the
+probe waits for a button (the mouse's, or the pad's without a mouse) to be
+pressed and released.
 
 ## Building
 
@@ -71,12 +76,20 @@ Drive take; 32 KB of save RAM declared in its header) and
    gets a save file of its own (the probe uses all 32 KB of it and clears
    it when a run starts).
 2. Plug the XN-110 mouse into the controller port (it replaces the pad).
-   Without a mouse the probe still runs and logs "no mouse".
-3. Turn on. The probe runs by itself for about two and a half minutes and
-   says on screen what to do; the table below lists it. Keep your hands off
-   the mouse until it asks. Photograph each of the seven raster tests while
-   it says PHOTOGRAPH THE SCREEN NOW (the test number is in large letters);
-   the result screens after the timing tests are worth a photograph too.
+   Without a mouse the probe still runs, driven by the pad, and logs "no
+   mouse".
+3. Turn on. The title screen says what the probe does; press and release
+   any button to start. Before every step it waits for a press and release
+   again, so take your time: the run takes as long as you do (its
+   measurements add up to about a minute). The table below lists the steps.
+   - After each timing test (phases 2-5) its results stay up until you
+     press; they are worth a photograph.
+   - Photograph each of the seven raster tests while it says PHOTOGRAPH THE
+     SCREEN NOW (the test number is in large letters), then press.
+   - Each mouse phase shows what to do. Read it, click, and do it during
+     the three-second countdown that follows (start moving, or press and
+     hold the button), until the next screen appears. The click that starts
+     a phase is separate from any button the phase asks you to hold.
 4. At ALL DONE, turn the console off and dump the probe's `.sav`. Put it in
    `results/hardware/`.
 
@@ -89,36 +102,51 @@ and records the vector, PC and SR in the header.
 
 ### Phases
 
-The phase number is in SRAM at 0x02000008 (see *SRAM log*). Times are in
-vertical blanks (about 60 a second). Each mouse phase shows its instruction
-and a countdown for exactly 240 vertical blanks from the moment its number
-is published, then measures for its window; the counters are emptied as the
-window opens.
+The phase number is in SRAM at 0x02000008, what the probe is waiting for
+in the step byte at 0x0200000B, and the raster test on screen at 0x02000034
+(see *SRAM log*). Frames are vertical blanks (about 60 a second); "press"
+is a press and release of any button, and the probe waits for it with no
+time limit. A mouse phase, after its press, counts down for exactly 180
+vertical blanks (from the one it publishes step 0xA1 at) and then measures
+for its window; the counters are emptied as the window opens.
 
 | Phase | What it does | Frames | What you do |
 | --- | --- | --- | --- |
-| 1 | title | 180 | nothing |
-| 2 | bus registers; frame period: 4 x 1 frame, 2 x 8, 1 x 64 | about 95, then 120 of results | hands off |
-| 3 | HCOUNT/VCOUNT trace, 240 lines | about 10, then 120 of results | hands off |
-| 4 | the same in 224-line mode (the picture shrinks for a moment) | about 10, then 120 | hands off |
-| 5 | fetch and memory costs | about 15, then 120 | hands off |
-| 6 | raster tests 1-7 (step byte = test): 2 + 16 capture frames, then 300 on show | 7 x 318 | photograph each test |
+| 1 | title and instructions | until the press | press to start |
+| 2 | bus registers; frame period: 4 x 1 frame, 2 x 8, 1 x 64; results | about 95, then until the press | hands off, then press |
+| 3 | HCOUNT/VCOUNT trace, 240 lines; results | about 10, then until the press | press |
+| 4 | the same in 224-line mode (the picture shrinks for a moment) | about 10, then until the press | press |
+| 5 | fetch and memory costs; results | about 15, then until the press | press |
+| 6 | raster tests 1-7: 2 + 16 capture frames each, then on show | 18 each, then until the press | photograph each test, then press |
 | 10 | mouse detection (pad and mouse scan) | 30 | hands off |
-| 11 | (a) idle: 0x010/12/14 and 0x050/52 every frame | 240 + 120 | hands off |
-| 12 | (b) circles: the same | 240 + 120 | move the mouse in circles |
-| 13 | (c) left: the same | 240 + 60 | hold the left button |
-| 14 | (c) right | 240 + 60 | hold the right button |
-| 15 | (c) both | 240 + 60 | hold both buttons |
-| 16 | (d) calibration: 0x050/52 every frame | 240 + 180 | move fast to the right, lift, repeat |
-| 17 | (d) overflow: 0x050/52 once a second (5 reads) | 240 + 300 | keep moving fast to the right |
-| 18 | (d) calibration, left | 240 + 180 | move fast to the left, lift, repeat |
-| 19 | (d) overflow, left | 240 + 300 | keep moving fast to the left |
-| 20 | (e) pad and mouse scan both armed: 0x050/52 every frame | 240 + 180 | move the mouse around steadily |
-| 21 | (e) mouse scan alone (the control) | 240 + 180 | the same |
+| 11 | (a) idle: 0x010/12/14 and 0x050/52 every frame | press, 180, 120 | hands off |
+| 12 | (b) circles: the same | press, 180, 120 | move the mouse in circles |
+| 13 | (c) left: the same | press, 180, 60 | hold the left button |
+| 14 | (c) right | press, 180, 60 | hold the right button |
+| 15 | (c) both | press, 180, 60 | hold both buttons |
+| 16 | (d) calibration: 0x050/52 every frame | press, 180, 180 | move fast to the right, lift, repeat |
+| 17 | (d) overflow: 0x050/52 once a second (5 reads) | press, 180, 300 | keep moving fast to the right |
+| 18 | (d) calibration, left | press, 180, 180 | move fast to the left, lift, repeat |
+| 19 | (d) overflow, left | press, 180, 300 | keep moving fast to the left |
+| 20 | (e) pad and mouse scan both armed: 0x050/52 every frame | press, 180, 180 | move the mouse around steadily |
+| 21 | (e) mouse scan alone (the control) | press, 180, 180 | the same |
 | 254 | done | | turn off, dump the save |
 
-Phases 1-5 also write 0xEE to the step byte while their results are on
-screen. Phases (a)-(d) arm the mouse scan alone.
+Without a mouse, phase 10 says so and waits for a pad press, and phases
+11-21 are skipped. Phases (a)-(d) arm the mouse scan alone.
+
+The step byte:
+
+| Value | Meaning |
+| --- | --- |
+| 0x00 | working by itself |
+| 0xA0 | waiting for a press, every button up |
+| 0xA1 | a mouse phase's countdown (the window opens 180 frames after it is published) |
+| 0xA2 | measuring: a mouse phase's window, or a raster test's capture frames |
+| 0xA3 | waiting for every button to be let go before it asks for the press (a button still held from a boot or from the phase before) |
+
+A button down when a wait starts does not count: the probe waits for it
+to be let go (0xA3) and only then asks for the press (0xA0).
 
 ## Running it in the emulator
 
@@ -129,14 +157,17 @@ LoopyMSE probe/LoopyProbe.bin --bios BIOS.bin --sound-bios SOUNDBIOS.bin --no-in
 ```
 
 The script (`emulator-script.txt`, generated by `gen_emulator_script.py`;
-edit that and run it again) waits on the phase byte with `wait-until`, acts
-out every mouse phase (motion of 200 counts every 5 frames, 2400 a second,
-for the overflow test), takes a `shot` of each result screen, raster test
-and mouse phase, dumps the save RAM to `probe-sram.bin` and ends with
-`exit 0`; a run that ends any other way (exit code 3 is a `wait-until`
-timeout) did not finish. It holds the left button at boot, so a finished
-log already in `results/emulator/LoopyProbe.sav` is erased and the probe
-runs again. The run takes about 7,800 frames.
+edit that and run it again) waits with `wait-until` on the phase byte, the
+raster test byte and the step byte, answers every 0xA0 with `mouse click
+left`, acts out every mouse phase from its countdown (0xA1) on (motion of
+200 counts every 5 frames, 2400 a second, for the overflow test; held
+buttons let go once the next phase shows), takes a `shot` of the title,
+each result screen, raster test and mouse phase, dumps the save RAM to
+`probe-sram.bin` and ends with `exit 0`; a run that ends any other way
+(exit code 3 is a `wait-until` timeout) did not finish. It holds the left
+button at boot, so a finished log already in
+`results/emulator/LoopyProbe.sav` is erased and the probe runs again, and
+lets go of it at the title. The run takes about 4,500 frames.
 
 Question 3 is about the emulator's *console* timing model, which is not the
 default (the default, `stock`, is fast and optimistic). Run it a second
@@ -187,7 +218,7 @@ record's body is written before the count that covers it.
 | 0x08 | 1 | **current phase** (the table above) |
 | 0x09 | 1 | flags: 1 done, 2 mouse present, 4 a finished log was erased on request, 8 an unfinished log was replaced, 0x10 CPU exception |
 | 0x0A | 1 | the phase the replaced unfinished log had reached |
-| 0x0B | 1 | step within the phase (raster test 1-7; 0xEE results on screen) |
+| 0x0B | 1 | **step**: what the probe is waiting for (0xA0-0xA3, the table above; 0 working) |
 | 0x0C | 2 | WCR3 as the BIOS left it |
 | 0x0E | 2 | record capacity |
 | 0x10 | 12 | build date |
@@ -195,6 +226,7 @@ record's body is written before the count that covers it.
 | 0x24 | 4 | vertical blanks counted, at the last phase change |
 | 0x28 | 1 | exception vector (4, 6, 9, 10) |
 | 0x2C / 0x30 | 4 / 4 | the exception's PC / SR |
+| 0x34 | 1 | **the raster test on screen** (1-7), 0 otherwise |
 | 0x40 | 16 each | records: type, sub, seven 16-bit values (`src/probe.h` lists them) |
 
 ## Files

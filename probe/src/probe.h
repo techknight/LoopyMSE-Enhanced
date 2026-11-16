@@ -23,7 +23,7 @@
 //   0x08  u8  current phase (PH_*); an automation script waits on it
 //   0x09  u8  flags (LF_*)
 //   0x0A  u8  the phase a partial log found at boot had reached (else 0)
-//   0x0B  u8  step within the phase (the raster test's variant)
+//   0x0B  u8  step: what the probe is waiting for (STEP_*), 0 while working
 //   0x0C  u16 WCR3 as the BIOS left it
 //   0x0E  u16 record capacity
 //   0x10  char[12] build date (__DATE__)
@@ -31,6 +31,7 @@
 //   0x24  u32 vertical blanks the probe has counted, at the last phase change
 //   0x28  u8  CPU exception vector (4, 6, 9, 10) if one happened
 //   0x2C  u32 the exception's PC, 0x30 u32 its SR
+//   0x34  u8  the raster test on screen (1-7), else 0
 //   0x40  records of PB_REC_SIZE bytes: u8 type, u8 sub, 7 x u16 (a..g)
 // ---------------------------------------------------------------------------
 
@@ -53,6 +54,7 @@
 #define H_EXC_KIND  0x28
 #define H_EXC_PC    0x2C
 #define H_EXC_SR    0x30
+#define H_TEST      0x34
 
 #define LF_DONE      0x01   // the run reached its end; kept at the next boot
 #define LF_MOUSE     0x02   // a mouse was detected
@@ -61,9 +63,11 @@
 #define LF_EXCEPTION 0x10   // a CPU exception stopped the run
 
 // ---------------------------------------------------------------------------
-// Phases. Each mouse phase shows its prompt for PROMPT_FRAMES vertical blanks
-// from the moment it is published, then measures for its window; see the
-// table in README.md.
+// Phases (the table in README.md). Nothing the person at the console has to
+// read or do runs on a timer: the probe waits for a button to be pressed and
+// let go before every step. A mouse phase then counts down for
+// COUNTDOWN_FRAMES vertical blanks (from the vertical blank it publishes
+// STEP_GETREADY at) and measures for its window (STEP_MEASURE).
 // ---------------------------------------------------------------------------
 
 enum {
@@ -88,11 +92,13 @@ enum {
 	PH_DONE = 254,
 };
 
-#define PROMPT_FRAMES 240
+// The step byte (0x0B). 0 while the probe works by itself.
+#define STEP_PRESS    0xA0  // waiting for a press, every button up
+#define STEP_GETREADY 0xA1  // a mouse phase's countdown
+#define STEP_MEASURE  0xA2  // measuring: a mouse window, a raster capture
+#define STEP_RELEASE  0xA3  // waiting for every button to be let go first
 
-// The step byte while a test's results stay on screen (RESULT_FRAMES).
-#define STEP_RESULTS 0xEE
-#define RESULT_FRAMES 120
+#define COUNTDOWN_FRAMES 180
 
 // ---------------------------------------------------------------------------
 // Record types (sub byte and payload a..g as noted).
@@ -154,8 +160,9 @@ void LogStart(uint8_t flags);           // erase and start a new log
 void LogRec(uint8_t type, uint8_t sub, const uint16_t v[7]);
 #define LOG(type, sub, ...) \
 	LogRec((type), (sub), (const uint16_t[7]) { __VA_ARGS__ })
-void LogPhase(uint8_t phase);
+void LogPhase(uint8_t phase);           // also clears the step and the test
 void LogStep(uint8_t step);
+void LogTest(uint8_t test);
 void LogFlags(uint8_t set);
 uint16_t LogCount(void);
 #define HI16(x) ((uint16_t) ((uint32_t) (x) >> 16))
@@ -218,7 +225,19 @@ void TestMemory(void);                  // memcost.c
 void TestRaster(void);                  // raster.c
 int  MouseDetect(void);                 // mouse.c
 void TestMouse(void);
+
+// Buttons (mouse.c): any mouse or pad button, by the presence bit.
 int  ButtonHeld(void);
+struct Press {
+	uint8_t state;                      // 0 (start), 1 all up, 2 pressed
+};
+// Once a vertical blank: nonzero once a button has been pressed and let go
+// (a button already down at the start must be let go first). Publishes
+// STEP_RELEASE and STEP_PRESS as it goes.
+int  PressStep(struct Press *p);
+// Present(), then wait (no time limit) for a press and its release; the
+// step is 0 again afterwards.
+void WaitPress(void);
 
 // probes.s, copied where they run
 typedef void (*Probe)(volatile void *a, uint32_t n, volatile void *b,

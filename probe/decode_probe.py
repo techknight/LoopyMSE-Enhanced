@@ -39,6 +39,8 @@ FLAGS = [(0x01, "done"), (0x02, "mouse present"),
          (0x10, "a CPU exception stopped the run")]
 EXCEPTIONS = {4: "illegal instruction", 6: "illegal slot instruction",
               9: "CPU address error", 10: "DMA address error"}
+STEPS = {0: "working", 0xA0: "waiting for a press", 0xA1: "counting down",
+         0xA2: "measuring", 0xA3: "waiting for buttons to be let go"}
 
 R_MARK, R_BSC, R_FRAME = 0x01, 0x10, 0x20
 R_HV_SUM, R_HV_HRUN, R_HV_HJUMP, R_HV_HJRAW = 0x30, 0x31, 0x32, 0x33
@@ -143,6 +145,7 @@ def load(path):
         date=hdr[0x10:0x1C].split(b"\0")[0].decode("ascii", "replace"),
         time=hdr[0x1C:0x24].split(b"\0")[0].decode("ascii", "replace"),
         frames=struct.unpack_from(">I", hdr, 0x24)[0],
+        test=hdr[0x34],
         exc=hdr[0x28], exc_pc=struct.unpack_from(">I", hdr, 0x2C)[0],
         exc_sr=struct.unpack_from(">I", hdr, 0x30)[0])
     recs = []
@@ -181,7 +184,9 @@ def header(log):
     if "truncated" in log:
         print(f"  the file ends after record {log['truncated']}")
     print(f"  built {log['date']} {log['time']}; phase reached: {log['phase']} "
-          f"({PHASES.get(log['phase'], '?')}), step {log['step']}")
+          f"({PHASES.get(log['phase'], '?')}), step 0x{log['step']:02X} "
+          f"({STEPS.get(log['step'], '?')})"
+          + (f", raster test {log['test']}" if log["test"] else ""))
     flags = [name for bit, name in FLAGS if log["flags"] & bit]
     print(f"  flags: {', '.join(flags) if flags else 'none'}")
     if log["flags"] & 0x08:

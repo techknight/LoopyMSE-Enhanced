@@ -11,13 +11,14 @@
 // bit 7 detect, bit 6 right button and bit 4 left (active-low), bits 3-0
 // the encoders' raw gray code, which changes only when the mouse moves.
 //
-// The user has only the mouse, so every phase runs on a clock: it is
-// published in the SRAM header, shows its instruction and a countdown for
-// PROMPT_FRAMES vertical blanks, and then measures for a fixed window (the
-// table below), so an emulator script can act each one out in step. The
-// counters are read once at a window's start, to empty them. Phases (a)-(d)
-// arm the mouse scan alone; (e) arms both, then the mouse alone again as
-// the control.
+// Whoever is at the console has only the mouse to answer with. Each phase is
+// published in the SRAM header and shows its instruction until a mouse
+// button is pressed and let go (STEP_PRESS); then, with every button up, a
+// countdown of COUNTDOWN_FRAMES vertical blanks (STEP_GETREADY), and then a
+// window of a fixed length (STEP_MEASURE; the table below), so an emulator
+// script can act each one out in step. The counters are read once at a
+// window's start, to empty them. Phases (a)-(d) arm the mouse scan alone;
+// (e) arms both, then the mouse alone again as the control.
 //
 //   phase  window  reads
 //   11      120    (a) hands off: 010/12/14 and 050/52 every frame
@@ -44,15 +45,54 @@
 // vertical blanks, and a missed one would stretch them).
 #define SHOW_EVERY 6
 
+// Any button, by the presence bits of 0x010: a mouse's from 0x050 (left bit
+// 12, right bit 14, active-low; the read also empties the X counter, which
+// no window is open to care about), pad 1's from the pad registers.
 int ButtonHeld(void)
 {
 	uint16_t g0 = VDP.IO_GAMEPAD[0];
 
-	if (g0 & 0x8000)                        // mouse: left bit 12, right 14
-		return (~g0 & 0x5000) != 0;
-	if (g0 & 0x0001)                        // pad 1 present: any button
+	if (g0 & 0x8000)
+		return (~VDP.IO_MOUSEX & 0x5000) != 0;
+	if (g0 & 0x0001)
 		return (READ_GAMEPAD1_RAW & 0x0FFE) != 0;
 	return 0;
+}
+
+int PressStep(struct Press *p)
+{
+	int held = ButtonHeld();
+
+	switch (p->state) {
+	case 0:                                 // let go of anything held
+		if (held) {
+			LogStep(STEP_RELEASE);
+			return 0;
+		}
+		p->state = 1;
+		LogStep(STEP_PRESS);
+		return 0;
+	case 1:                                 // a press
+		if (held)
+			p->state = 2;
+		return 0;
+	default:                                // and its release
+		if (held)
+			return 0;
+		p->state = 0;
+		return 1;
+	}
+}
+
+void WaitPress(void)
+{
+	struct Press p = { 0 };
+
+	Present();
+	do
+		WaitVblank();
+	while (!PressStep(&p));
+	LogStep(0);
 }
 
 // With both scans armed for half a second (loopy-maniac's detection mode):
@@ -87,11 +127,14 @@ static void Status(void)
 	     VDP.IO_GAMEPAD[1], VDP.IO_GAMEPAD[2]);
 }
 
-// Publish the phase at the start of a frame, then count the prompt down.
-// Returns at the vertical blank that starts the window.
+// Publish the phase at the start of a frame and show the instruction until
+// a mouse button is pressed and let go; then count down, the instruction
+// still up. Returns at the vertical blank that starts the window, the
+// COUNTDOWN_FRAMES-th after the one STEP_GETREADY was published at.
 static void Prompt(uint8_t phase, const char *what, const char *how,
                    const char *how2)
 {
+	struct Press p = { 0 };
 	unsigned f;
 
 	WaitVblank();
@@ -100,15 +143,31 @@ static void Prompt(uint8_t phase, const char *what, const char *how,
 	Textf(TEXT_X, ROW(1), 2, C_YELLOW, "%s", what);
 	Line(4, C_INK, "%s", how);
 	Line(5, C_INK, "%s", how2);
-	for (f = 0; f < PROMPT_FRAMES; ++f) {
+	Line(14, C_YELLOW, "WHEN YOU ARE READY, PRESS AND");
+	Line(15, C_YELLOW, "RELEASE A MOUSE BUTTON");
+	Present();
+	for (f = 0;; ++f) {
+		WaitVblank();
+		if (PressStep(&p))
+			break;
+		if (f % SHOW_EVERY == 0)
+			Status();
+		Present();
+	}
+
+	ClearRows(ROW(14), ROW(14) + 8);
+	WaitVblank();
+	LogStep(STEP_GETREADY);
+	for (f = 0; f < COUNTDOWN_FRAMES; ++f) {
 		if (f % 60 == 0)
 			Line(15, C_YELLOW, "GET READY: STARTS IN %u",
-			     (PROMPT_FRAMES - f) / 60);
+			     (COUNTDOWN_FRAMES - f) / 60);
 		if (f % SHOW_EVERY == 0)
 			Status();
 		Present();
 		WaitVblank();
 	}
+	LogStep(STEP_MEASURE);
 	Line(15, C_GREEN, "NOW!");
 	Present();
 }
@@ -230,39 +289,43 @@ static void Blind(uint8_t phase, unsigned window)
 
 void TestMouse(void)
 {
-	Prompt(PH_IDLE, "HANDS OFF", "KEEP YOUR HANDS OFF THE MOUSE",
-	       "(THE REGISTERS ARE READ IDLE)");
+	// Each instruction is for after the start click: the measurement
+	// begins as the countdown ends, so motion and held buttons start
+	// during the countdown.
+	Prompt(PH_IDLE, "HANDS OFF", "AFTER THE CLICK, TAKE YOUR HAND OFF",
+	       "THE MOUSE UNTIL THE NEXT SCREEN");
 	Sample(PH_IDLE, W_IDLE);
 
-	Prompt(PH_CIRCLES, "CIRCLES", "MOVE THE MOUSE IN CIRCLES",
-	       "AND KEEP GOING UNTIL TOLD TO STOP");
+	Prompt(PH_CIRCLES, "CIRCLES", "DURING THE COUNTDOWN, START MOVING IN",
+	       "CIRCLES; KEEP GOING TO THE NEXT SCREEN");
 	Sample(PH_CIRCLES, W_CIRCLES);
 
-	Prompt(PH_LEFT, "HOLD LEFT", "STOP MOVING. PRESS AND HOLD",
-	       "THE LEFT BUTTON");
+	Prompt(PH_LEFT, "HOLD LEFT", "DURING THE COUNTDOWN, PRESS AND HOLD",
+	       "LEFT, STILL, UNTIL THE NEXT SCREEN");
 	Sample(PH_LEFT, W_BUTTON);
-	Prompt(PH_RIGHT, "HOLD RIGHT", "RELEASE LEFT. PRESS AND HOLD",
-	       "THE RIGHT BUTTON");
+	Prompt(PH_RIGHT, "HOLD RIGHT", "DURING THE COUNTDOWN, PRESS AND HOLD",
+	       "RIGHT, STILL, UNTIL THE NEXT SCREEN");
 	Sample(PH_RIGHT, W_BUTTON);
-	Prompt(PH_BOTHBTN, "HOLD BOTH", "PRESS AND HOLD BOTH BUTTONS", "");
+	Prompt(PH_BOTHBTN, "HOLD BOTH", "DURING THE COUNTDOWN, PRESS AND HOLD",
+	       "BOTH BUTTONS UNTIL THE NEXT SCREEN");
 	Sample(PH_BOTHBTN, W_BUTTON);
 
-	Prompt(PH_CAL_RIGHT, "FAST RIGHT", "RELEASE. MOVE FAST TO THE RIGHT,",
-	       "LIFT, PUT DOWN LEFT, REPEAT");
+	Prompt(PH_CAL_RIGHT, "FAST RIGHT", "DURING THE COUNTDOWN, START MOVING FAST",
+	       "RIGHT; LIFT, PUT DOWN LEFT, REPEAT");
 	Deltas(PH_CAL_RIGHT, W_CAL);
-	Prompt(PH_OVF_RIGHT, "FAST RIGHT", "KEEP MOVING FAST TO THE RIGHT,",
+	Prompt(PH_OVF_RIGHT, "FAST RIGHT", "THE SAME AGAIN: FAST TO THE RIGHT,",
 	       "LIFT, PUT DOWN LEFT, REPEAT");
 	Blind(PH_OVF_RIGHT, W_OVF);
-	Prompt(PH_CAL_LEFT, "FAST LEFT", "NOW MOVE FAST TO THE LEFT,",
-	       "LIFT, PUT DOWN RIGHT, REPEAT");
+	Prompt(PH_CAL_LEFT, "FAST LEFT", "DURING THE COUNTDOWN, START MOVING FAST",
+	       "LEFT; LIFT, PUT DOWN RIGHT, REPEAT");
 	Deltas(PH_CAL_LEFT, W_CAL);
-	Prompt(PH_OVF_LEFT, "FAST LEFT", "KEEP MOVING FAST TO THE LEFT,",
+	Prompt(PH_OVF_LEFT, "FAST LEFT", "THE SAME AGAIN: FAST TO THE LEFT,",
 	       "LIFT, PUT DOWN RIGHT, REPEAT");
 	Blind(PH_OVF_LEFT, W_OVF);
 
 	ScreenScan(1, 1, 1);
-	Prompt(PH_SCAN_BOTH, "MOVE AROUND", "MOVE THE MOUSE AROUND STEADILY",
-	       "(PAD AND MOUSE SCAN BOTH ON)");
+	Prompt(PH_SCAN_BOTH, "MOVE AROUND", "DURING THE COUNTDOWN, START MOVING THE",
+	       "MOUSE AROUND STEADILY (PAD SCAN ON TOO)");
 	Deltas(PH_SCAN_BOTH, W_SCAN);
 	ScreenScan(1, 0, 1);
 	Prompt(PH_SCAN_MOUSE, "MOVE AROUND", "THE SAME AGAIN, STEADILY",

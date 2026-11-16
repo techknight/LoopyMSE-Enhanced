@@ -102,6 +102,7 @@ void LogPhase(uint8_t phase)
 {
 	Put32(H_FRAMES, vblanks);
 	SRAM[H_STEP] = 0;
+	SRAM[H_TEST] = 0;
 	SRAM[H_PHASE] = phase;
 	LOG(R_MARK, phase, HI16(vblanks), LO16(vblanks));
 }
@@ -109,6 +110,11 @@ void LogPhase(uint8_t phase)
 void LogStep(uint8_t step)
 {
 	SRAM[H_STEP] = step;
+}
+
+void LogTest(uint8_t test)
+{
+	SRAM[H_TEST] = test;
 }
 
 void LogFlags(uint8_t set)

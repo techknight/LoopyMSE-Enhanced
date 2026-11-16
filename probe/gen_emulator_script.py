@@ -7,21 +7,30 @@
 
     python gen_emulator_script.py
 
-Every phase is synchronised on the probe's phase byte in SRAM (0x02000008)
-with wait-until; the actions inside a phase are offsets from that moment.
-The probe publishes a phase at a vertical blank and the script sees it at
-the next frame boundary, so an offset of N acts N+1 frames after the
-publish. A mouse phase's window opens PROMPT frames after its publish, and
-the counters are emptied then, so motion is started 30 frames early and run
-to the window's end: what lands before the window is simply thrown away.
+The probe waits for a button to be pressed and let go before every step, and
+says so in its SRAM header: the phase byte (0x02000008), the step byte
+(0x0200000B: 0xA0 waiting for a press with every button up, 0xA1 a mouse
+phase's countdown, 0xA2 measuring, 0xA3 waiting for buttons to be let go
+first, 0 working) and the raster test byte (0x02000034). The script waits
+on those with wait-until and answers each 0xA0 with `mouse click left` (the
+emulator runs with the mouse plugged in).
+
+A mouse phase's window opens COUNTDOWN vertical blanks after the one the
+probe publishes 0xA1 at; the script sees 0xA1 at the next frame boundary,
+so an offset of N from there acts N+1 frames after the publish. The counters
+are emptied as the window opens, so motion is started PRE frames early and
+run to the window's end: what lands before the window is thrown away. A
+button held for a phase is let go once the next phase is seen; the probe
+waits for that (0xA3) before it asks for the next press.
 """
 
 import os
 
 PHASE = 0x02000008      # src/probe.h H_PHASE
 STEP = 0x0200000B       # H_STEP
-PROMPT = 240            # PROMPT_FRAMES
-STEP_RESULTS = 0xEE
+TEST = 0x02000034       # H_TEST
+STEP_PRESS, STEP_GETREADY = 0xA0, 0xA1
+COUNTDOWN = 180         # COUNTDOWN_FRAMES
 PRE = 30                # motion starts this many frames before a window
 
 # src/mouse.c windows
@@ -45,13 +54,16 @@ def wait_phase(n, timeout, note):
     emit(f"wait-until mem.b 0x{PHASE:08X} == {n} timeout {timeout}")
 
 
-def wait_results(name, timeout=1200):
-    emit(f"wait-until mem.b 0x{STEP:08X} == {STEP_RESULTS} timeout {timeout}")
-    emit(f"+60 shot {name}")
+def press(shot=None, timeout=1200):
+    """Wait until the probe asks for a press, take a picture, click."""
+    emit(f"wait-until mem.b 0x{STEP:08X} == 0x{STEP_PRESS:02X} timeout {timeout}")
+    if shot:
+        emit(f"+10 shot {shot}")
+    emit("mouse click left")
 
 
 def schedule(events):
-    """events: (offset from the phase's wait-until, command), any order."""
+    """events: (offset from the last wait-until, command), any order."""
     at = 0
     for off, cmd in sorted(events, key=lambda e: e[0]):
         gap = off - at
@@ -70,14 +82,16 @@ def moves(start, end, pattern, step=5):
 
 
 def mouse_phase(n, window, note, events, shot, before=()):
-    """A mouse phase; `before` runs as soon as the phase is seen (releasing
-    the previous phase's buttons, whose window has just closed)."""
+    """A mouse phase: `before` runs as soon as the phase is seen (letting go
+    of the previous phase's buttons), then the start click, then `events`
+    at offsets from the countdown's start."""
     wait_phase(n, 1200, note)
     for cmd in before:
         emit(cmd)
+    press(f"{n}-prompt")
+    emit(f"wait-until mem.b 0x{STEP:08X} == 0x{STEP_GETREADY:02X} timeout 300")
     ev = list(events)
-    ev.append((120, f"shot {n}-prompt"))
-    ev.append((PROMPT + window // 2, f"shot {n}-{shot}"))
+    ev.append((COUNTDOWN + window // 2, f"shot {n}-{shot}"))
     schedule(ev)
 
 
@@ -91,52 +105,56 @@ emit("#       --hidden --fast --input.device=mouse --script probe/emulator-scrip
 emit("#       --out probe/results/emulator --frames 12000")
 emit("# The log ends up in probe/results/emulator/LoopyProbe.sav (and probe-sram.bin).")
 emit("#")
-emit(f"# 0x{PHASE:08X} is the probe's phase byte, 0x{STEP:08X} its step (src/probe.h).")
+emit(f"# 0x{PHASE:08X} is the probe's phase byte, 0x{STEP:08X} its step (0xA0: waiting")
+emit(f"# for a press), 0x{TEST:08X} the raster test on screen (src/probe.h).")
 emit()
 emit("plug mouse")
 emit("# A finished log already in the save is kept unless a button is held for")
-emit("# three seconds: hold left until the run has started (harmless otherwise).")
+emit("# three seconds: hold left until the new run's title (harmless otherwise).")
 emit("mouse down left")
-wait_phase(2, 2400, "frame period (the run has started)")
+wait_phase(1, 2400, "title (the run has started)")
 emit("mouse up left")
-wait_results("02-frame")
-wait_phase(3, 1200, "HCOUNT/VCOUNT, 240 lines")
-wait_results("03-hv240")
-wait_phase(4, 1200, "HCOUNT/VCOUNT, 224 lines")
-wait_results("04-hv224")
-wait_phase(5, 1200, "fetch and memory costs")
-wait_results("05-memory")
-wait_phase(6, 1200, "raster artifacts, seven tests")
+press("01-title")
+wait_phase(2, 600, "frame period")
+press("02-frame")
+wait_phase(3, 600, "HCOUNT/VCOUNT, 240 lines")
+press("03-hv240")
+wait_phase(4, 600, "HCOUNT/VCOUNT, 224 lines")
+press("04-hv224")
+wait_phase(5, 600, "fetch and memory costs")
+press("05-memory")
+wait_phase(6, 600, "raster artifacts, seven tests")
 for t in range(1, 8):
-    emit(f"wait-until mem.b 0x{STEP:08X} == {t} timeout 900")
-    emit(f"+150 shot 06-raster-{t}")
+    emit(f"wait-until mem.b 0x{TEST:08X} == {t} timeout 600")
+    press(f"06-raster-{t}", timeout=600)
 
-wait_phase(10, 900, "mouse detection")
+wait_phase(10, 600, "mouse detection")
 
 mouse_phase(11, W_IDLE, "(a) hands off", [], "idle")
 mouse_phase(12, W_CIRCLES, "(b) circles",
-            moves(PROMPT - PRE, PROMPT + W_CIRCLES, CIRCLE), "circles")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_CIRCLES, CIRCLE), "circles")
 mouse_phase(13, W_BUTTON, "(c) left held",
-            [(PROMPT - PRE, "mouse down left")], "left")
+            [(COUNTDOWN - PRE, "mouse down left")], "left")
 mouse_phase(14, W_BUTTON, "(c) right held",
-            [(PROMPT - PRE, "mouse down right")], "right",
+            [(COUNTDOWN - PRE, "mouse down right")], "right",
             before=["mouse up left"])
 mouse_phase(15, W_BUTTON, "(c) both held",
-            [(PROMPT - PRE, "mouse down left"), (PROMPT - PRE, "mouse down right")],
+            [(COUNTDOWN - PRE, "mouse down left"),
+             (COUNTDOWN - PRE, "mouse down right")],
             "both", before=["mouse up right"])
 mouse_phase(16, W_CAL, "(d) fast right, read every frame",
-            moves(PROMPT - PRE, PROMPT + W_CAL, [(FAST, 0)]), "fast-right",
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_CAL, [(FAST, 0)]), "fast-right",
             before=["mouse up left", "mouse up right"])
 mouse_phase(17, W_OVF, "(d) fast right, read once a second",
-            moves(PROMPT - PRE, PROMPT + W_OVF, [(FAST, 0)]), "overflow-right")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_OVF, [(FAST, 0)]), "overflow-right")
 mouse_phase(18, W_CAL, "(d) fast left, read every frame",
-            moves(PROMPT - PRE, PROMPT + W_CAL, [(-FAST, 0)]), "fast-left")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_CAL, [(-FAST, 0)]), "fast-left")
 mouse_phase(19, W_OVF, "(d) fast left, read once a second",
-            moves(PROMPT - PRE, PROMPT + W_OVF, [(-FAST, 0)]), "overflow-left")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_OVF, [(-FAST, 0)]), "overflow-left")
 mouse_phase(20, W_SCAN, "(e) pad and mouse scan both armed, moving",
-            moves(PROMPT - PRE, PROMPT + W_SCAN, STEADY), "scan-both")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_SCAN, STEADY), "scan-both")
 mouse_phase(21, W_SCAN, "(e) mouse scan alone, the same motion",
-            moves(PROMPT - PRE, PROMPT + W_SCAN, STEADY), "scan-mouse")
+            moves(COUNTDOWN - PRE, COUNTDOWN + W_SCAN, STEADY), "scan-mouse")
 
 wait_phase(254, 1200, "done")
 emit("+30 shot 99-done")
