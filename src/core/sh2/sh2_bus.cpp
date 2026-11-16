@@ -8,6 +8,7 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <set>
 
 #include "core/loopy_io.h"
 #include "core/sh2/peripherals/sh2_dmac.h"
@@ -34,6 +35,23 @@ static void misaligned(uint32_t addr, int size, bool write)
 
 #define ALIGN_CHECK(size, write) \
 	if (addr & (size - 1)) misaligned(addr, size, write);
+
+// A store to ROM (the BIOS or the cartridge) does nothing on the console. It is
+// usually a stray pointer, so it is reported (once per instruction address).
+static void rom_write(uint32_t addr)
+{
+	static std::set<uint32_t> reported;
+	uint32_t pc = OCPM::DMAC::is_dma_access() ? 0 : sh2.executing_addr;
+	if (!reported.insert(pc).second) return;
+	Log::fault("[SH2] write to ROM ignored (first at %08X), by the instruction at %08X", addr, pc);
+}
+
+#define ROM_CHECK()                \
+	if (sh2.pagetable[addr >> 12]) \
+	{                              \
+		rom_write(addr);           \
+		return;                    \
+	}
 
 // Console timing model: a data access by the executing instruction (fetches
 // are read outside begin/end, DMA is priced by the controller).
@@ -70,6 +88,7 @@ static uint32_t translate_addr(uint32_t addr)
 	if (addr >= LoopyIO::BASE_ADDR && addr < LoopyIO::END_ADDR) return LoopyIO::reg_##access(__VA_ARGS__);            \
 	if (addr >= Video::DMA_CTRL_START && addr < Video::DMA_CTRL_END) return Video::dma_ctrl_##access(__VA_ARGS__);    \
 	if (addr >= Video::DMA_START && addr < Video::DMA_END) return Video::dma_##access(__VA_ARGS__);                   \
+	if (addr >= Video::SYSCTL_START && addr < Video::SYSCTL_END) return Video::sysctl_##access(__VA_ARGS__);          \
 	if (addr >= OCPM::IO_BASE_ADDR && addr < OCPM::IO_END_ADDR) return OCPM::io_##access(__VA_ARGS__);                \
 	if (addr >= Sound::CTRL_START && addr < Sound::CTRL_END) return Sound::ctrl_##access(__VA_ARGS__);                \
 	if (addr >= Expansion::MAPPED_START && addr < Expansion::MAPPED_END) return Expansion::exp_##access(__VA_ARGS__); \
@@ -77,35 +96,41 @@ static uint32_t translate_addr(uint32_t addr)
 
 uint8_t unmapped_read8(uint32_t addr)
 {
-	Log::warn("[SH2] unmapped read8 %08X", addr);
+	Log::warn("[SH2] unmapped read8 %08X (pc %08X)", addr, sh2.executing_addr);
 	return 0;
 }
 
 uint16_t unmapped_read16(uint32_t addr)
 {
-	Log::warn("[SH2] unmapped read16 %08X", addr);
+	Log::warn("[SH2] unmapped read16 %08X (pc %08X)", addr, sh2.executing_addr);
 	return 0;
 }
 
 uint32_t unmapped_read32(uint32_t addr)
 {
-	Log::warn("[SH2] unmapped read32 %08X", addr);
+	Log::warn("[SH2] unmapped read32 %08X (pc %08X)", addr, sh2.executing_addr);
 	return 0;
 }
 
 void unmapped_write8(uint32_t addr, uint8_t value)
 {
-	Log::warn("[SH2] unmapped write8 %08X: %02X", addr, value);
+	//Area 3 is not wired on the Loopy. Pasocom Collection draws a little above
+	//bitmap VRAM (0x0C000000) through the BIOS and lands here; the console
+	//ignores it, so it is not worth a warning.
+	Log::log(
+		(addr >> 24) == 3 ? Log::DEBUG : Log::WARN, "[SH2] unmapped write8 %08X: %02X (pc %08X)", addr, value,
+		sh2.executing_addr
+	);
 }
 
 void unmapped_write16(uint32_t addr, uint16_t value)
 {
-	Log::warn("[SH2] unmapped write16 %08X: %04X", addr, value);
+	Log::warn("[SH2] unmapped write16 %08X: %04X (pc %08X)", addr, value, sh2.executing_addr);
 }
 
 void unmapped_write32(uint32_t addr, uint32_t value)
 {
-	Log::warn("[SH2] unmapped write32 %08X: %08X", addr, value);
+	Log::warn("[SH2] unmapped write32 %08X: %08X (pc %08X)", addr, value, sh2.executing_addr);
 }
 
 uint8_t read8(uint32_t addr)
@@ -158,13 +183,13 @@ void write8(uint32_t addr, uint8_t value)
 	COST(1, true, value);
 	addr = translate_addr(addr);
 	if (Watch::writes_active) Watch::on_write(addr, 1, value);
-	uint8_t* mem = sh2.pagetable[addr >> 12];
+	uint8_t* mem = sh2.write_pagetable[addr >> 12];
 	if (mem)
 	{
 		mem[addr & 0xFFF] = value;
 		return;
 	}
-
+	ROM_CHECK();
 	MMIO_ACCESS(write8, addr, value);
 }
 
@@ -174,13 +199,14 @@ void write16(uint32_t addr, uint16_t value)
 	COST(2, true, value);
 	addr = translate_addr(addr);
 	if (Watch::writes_active) Watch::on_write(addr, 2, value);
-	uint8_t* mem = sh2.pagetable[addr >> 12];
+	uint8_t* mem = sh2.write_pagetable[addr >> 12];
 	if (mem)
 	{
 		value = Common::bswp16(value);
 		memcpy(mem + (addr & 0xFFF), &value, 2);
 		return;
 	}
+	ROM_CHECK();
 	MMIO_ACCESS(write16, addr, value);
 }
 
@@ -190,13 +216,14 @@ void write32(uint32_t addr, uint32_t value)
 	COST(4, true, value);
 	addr = translate_addr(addr);
 	if (Watch::writes_active) Watch::on_write(addr, 4, value);
-	uint8_t* mem = sh2.pagetable[addr >> 12];
+	uint8_t* mem = sh2.write_pagetable[addr >> 12];
 	if (mem)
 	{
 		value = Common::bswp32(value);
 		memcpy(mem + (addr & 0xFFF), &value, 4);
 		return;
 	}
+	ROM_CHECK();
 	MMIO_ACCESS(write32, addr, value);
 }
 

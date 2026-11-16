@@ -55,7 +55,7 @@ void initialize(Config::CartInfo& info)
 	//on the first commit
 	state.sram_on_disk = info.sram_from_file ? state.sram : std::vector<uint8_t>();
 
-	Memory::map_sh2_pagetable(state.rom.data(), ROM_START, state.rom.size());
+	Memory::map_sh2_pagetable(state.rom.data(), ROM_START, state.rom.size(), false);
 	Memory::map_sh2_pagetable(state.sram.data(), SRAM_START, state.sram.size());
 }
 

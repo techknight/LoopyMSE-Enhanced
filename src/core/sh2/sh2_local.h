@@ -22,6 +22,7 @@ struct CPU
 	int pending_exception_vector;
 
 	uint8_t** pagetable;
+	uint8_t** write_pagetable;
 
 	std::unordered_map<uint32_t, HookFunc> hooks;
 

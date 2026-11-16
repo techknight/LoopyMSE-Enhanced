@@ -38,5 +38,6 @@ void set_trace(bool enabled);
 // The sticker cassette reported to the program: 0 = none, 1-7 = its type
 // (1 is XS-11, the only type the printer emulation produces prints for).
 void set_seal_cassette(int type);
+int get_seal_cassette();
 
 }

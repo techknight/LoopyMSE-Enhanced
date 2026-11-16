@@ -107,6 +107,7 @@ void initialize()
 	sh2 = {};
 
 	sh2.pagetable = Memory::get_sh2_pagetable();
+	sh2.write_pagetable = Memory::get_sh2_write_pagetable();
 
 	//TODO: make config option to skip BIOS boot?
 	bool skip_bios_boot = false;

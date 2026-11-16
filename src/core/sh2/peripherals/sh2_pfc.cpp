@@ -11,6 +11,11 @@ struct GpioState
 {
 	uint16_t output[2];
 	uint16_t direction[2];
+	//Pin function controls (PACR1/2, PBCR1/2) and CASCR: kept as written so
+	//read-modify-writes work; their pin functions are not emulated
+	uint16_t ctrl1[2];
+	uint16_t ctrl2[2];
+	uint16_t cascr;
 };
 
 static GpioState gpio;
@@ -67,6 +72,14 @@ uint16_t read16(uint32_t addr)
 	case 0x06:
 		gpio_port = (addr >> 1) & 1;
 		return gpio.direction[gpio_port];
+	case 0x08:
+	case 0x0C:
+		return gpio.ctrl1[(addr >> 2) & 1];
+	case 0x0A:
+	case 0x0E:
+		return gpio.ctrl2[(addr >> 2) & 1];
+	case 0x2E:
+		return gpio.cascr;
 	default:
 		Log::warn("[PFC] unmapped read %08X", addr);
 		return 0;
@@ -96,12 +109,18 @@ void write16(uint32_t addr, uint16_t value)
 	case 0x08:
 	case 0x0C:
 		gpio_port = (addr >> 2) & 1;
+		gpio.ctrl1[gpio_port] = value;
 		Log::debug("[PFC] GPIO write P%sCR1: %04X", gpio_port ? "B" : "A", value);
 		break;
 	case 0x0A:
 	case 0x0E:
 		gpio_port = (addr >> 2) & 1;
+		gpio.ctrl2[gpio_port] = value;
 		Log::debug("[PFC] GPIO write P%sCR2: %04X", gpio_port ? "B" : "A", value);
+		break;
+	case 0x2E:
+		//CASCR: the DRAM /CASH and /CASL pin functions (the BIOS sets 0xAFFF)
+		gpio.cascr = value;
 		break;
 	default:
 		Log::warn("[PFC] unmapped write %08X: %04X", addr, value);

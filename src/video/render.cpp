@@ -250,7 +250,11 @@ static void draw_bitmap(int index, int y)
 	bool is_8bit = false;
 	bool split_x = false, split_y = false;
 	int vram_width = 0, vram_height = 0;
-	switch (vdp.bitmap_ctrl)
+	//Only bits 2-0 count; mode 5 behaves as mode 0, and 6 and 7 as mode 1
+	int bitmap_mode = vdp.bitmap_ctrl & 7;
+	if (bitmap_mode == 5) bitmap_mode = 0;
+	else if (bitmap_mode >= 6) bitmap_mode = 1;
+	switch (bitmap_mode)
 	{
 	case 0x00:
 		is_8bit = true;
@@ -701,8 +705,13 @@ static void display_capture(int y)
 	switch (vdp.capture_ctrl.format)
 	{
 	case 0:
-		//Capture blended output in 15bpp
-		memcpy(vdp.capture_buffer, vdp.display_output.get(), DISPLAY_WIDTH * sizeof(uint16_t));
+		//Capture the blended output (what is displayed, backdrops included) in 15bpp
+		for (int x = 0; x < DISPLAY_WIDTH; x++)
+		{
+			uint16_t color = vdp.display_output[y * DISPLAY_WIDTH + x] & 0x7FFF;
+			capture_buffer_15bpp[x] = Common::bswp16(color);
+		}
+		break;
 	case 1:
 		//Capture screen A in 15bpp via the palette/backdrop
 		for (int x = 0; x < DISPLAY_WIDTH; x++)
@@ -752,8 +761,32 @@ void draw_scanline(int y)
 	case 0x05:
 		draw_screen_overlay(y, false);
 		break;
+	case 0x02:
+	case 0x03:
+		for (int x = 0; x < DISPLAY_WIDTH; x++)
+		{
+			uint16_t a = vdp.color_prio.output_screen_a ? read_screen(0, x) : 0;
+			uint16_t out = a;
+			if (vdp.dispmode == 0x03)
+			{
+				//High resolution: A and B alternate every half pixel (512 across).
+				//At 256 pixels wide, show the average of each pair.
+				uint16_t b = vdp.color_prio.output_screen_b ? read_screen(1, x) : 0;
+				int r = (((a >> 10) & 0x1F) + ((b >> 10) & 0x1F)) >> 1;
+				int g = (((a >> 5) & 0x1F) + ((b >> 5) & 0x1F)) >> 1;
+				int bl = ((a & 0x1F) + (b & 0x1F)) >> 1;
+				out = (r << 10) | (g << 5) | bl;
+			}
+			write_color(vdp.display_output, x, y, out);
+		}
+		break;
 	default:
-		Log::unimplemented("[Render] display mode %d", vdp.dispmode);
+		//Modes 6 and 7 show a black picture (the border stays)
+		for (int x = 0; x < DISPLAY_WIDTH; x++)
+		{
+			write_color(vdp.display_output, x, y, 0);
+		}
+		break;
 	}
 
 	if (vdp.capture_enable && y == vdp.capture_ctrl.scanline)

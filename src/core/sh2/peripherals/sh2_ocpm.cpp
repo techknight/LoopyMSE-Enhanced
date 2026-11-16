@@ -171,7 +171,9 @@ void io_write16(uint32_t addr, uint16_t value)
 	switch (addr)
 	{
 	case 0xFB8:
-		//Prevent log spam for WDT_TCSR
+	case 0xFBA:
+		//The watchdog (TCSR/TCNT, RSTCSR) is not emulated; programs kick it
+		//constantly, so stay quiet
 		return;
 	default:
 		Log::warn("[OCPM] unmapped write %08X: %04X", addr, value);

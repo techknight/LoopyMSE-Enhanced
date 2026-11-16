@@ -29,7 +29,12 @@ struct MouseState
 struct State
 {
 	uint16_t latched_sensors;
-	uint16_t print_temp;
+	uint16_t print_temp;  //ADC result of the last conversion, in bits 15-6
+	uint16_t adc_ctrl;	  //ADC channel select and sampling bits (5-0)
+	uint16_t exp_timing;  //Expansion strobe timing (0x020)
+	uint16_t print_motor;  //Stepper phases (0x042)
+	uint16_t head_ctrl;	   //Print head control (0x044)
+	uint16_t control_out;  //Controller output pins (0x054)
 	PadState pad;
 	MouseState mouse;
 	bool scan_pad;
@@ -122,7 +127,16 @@ static uint16_t read16_impl(uint32_t addr)
 	switch (addr)
 	{
 	case 0x000:
-		return state.print_temp;
+		//ANALOG_IN: the 10-bit result of the last conversion and the control bits
+		return state.print_temp | (state.adc_ctrl & 0x3F);
+	case 0x020:
+		return state.exp_timing;
+	case 0x042:
+		return state.print_motor & 0xF;
+	case 0x044:
+		return state.head_ctrl & 0xF;
+	case 0x054:
+		return state.control_out;
 	case 0x010:
 		if (state.scan_pad && state.pad.plugged)
 		{
@@ -189,10 +203,35 @@ void reg_write8(uint32_t addr, uint8_t value)
 static void write16_impl(uint32_t addr, uint16_t value)
 {
 	addr &= 0xFFE;
+	//The printer's motor and head registers only take writes while the printer
+	//is enabled (ENP, sensor register bit 8) and carry a fixed key in bits 15-4
+	bool printer_enabled = (state.latched_sensors & 0x0100) != 0;
 	switch (addr)
 	{
+	case 0x000:
+		//ANALOG_IN: bits 5-3 select the channel, bits 2-0 the sampling
+		state.adc_ctrl = value & 0x3F;
+		break;
+	case 0x020:
+		//EXP_TIMING: strobe speed of the sound and expansion areas
+		state.exp_timing = value & 0xF;
+		break;
 	case 0x030:
 		state.latched_sensors = (state.latched_sensors & ~0x0100) | (value & 0x0100);
+		break;
+	case 0x040:
+		//PRINT_HEAD_DATA: the dot data the print DMA streams (printing is
+		//emulated at a high level, so the data is not used)
+		break;
+	case 0x042:
+		if (printer_enabled && (value >> 4) == 0x5A5) state.print_motor = value;
+		break;
+	case 0x044:
+		if (printer_enabled && (value >> 4) == 0xA5A) state.head_ctrl = value;
+		break;
+	case 0x054:
+		//CONTROL_OUT: controller output pins in direct mode
+		state.control_out = value & 0x3F;
 		break;
 	default:
 		Log::warn("[IO] unmapped write16 %08X: %04X", addr, value);
@@ -266,11 +305,33 @@ void set_controller_plugged(bool plugged_pad, bool plugged_mouse)
 	}
 }
 
+//An ADC conversion of the channel ANALOG_IN selects (bits 5-3)
 void update_print_temp()
 {
-	float temp = 22.f;
-	int bits_temp = std::clamp((int)(temp * 16), 0, 0x3FF);
-	state.print_temp = bits_temp << 6;
+	int value;
+	switch ((state.adc_ctrl >> 3) & 7)
+	{
+	case 0:
+	{
+		//Print head thermistor; the BIOS prints below 580 and warns below 670
+		float temp = 22.f;
+		value = std::clamp((int)(temp * 16), 0, 0x3FF);
+		break;
+	}
+	case 1:
+		//Head calibration resistor (a typical head)
+		value = 0x1AF;
+		break;
+	case 2:
+		//Contrast knob, centred
+		value = 0x200;
+		break;
+	default:
+		//Cartridge analog inputs, not connected
+		value = 0x3FF;
+		break;
+	}
+	state.print_temp = value << 6;
 }
 
 //The sticker cassette in the printer: 0 = none, otherwise its type (1 = XS-11,
@@ -280,6 +341,11 @@ static int seal_cassette = 1;
 void set_seal_cassette(int type)
 {
 	seal_cassette = type & 7;
+}
+
+int get_seal_cassette()
+{
+	return seal_cassette;
 }
 
 void update_sensors()

@@ -21,7 +21,9 @@ constexpr static int MMIO_START = 0x05000000;
 void initialize(std::vector<uint8_t>& bios_rom);
 void shutdown();
 
-void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size);
+// Map memory for the CPU; ROM is mapped read-only (stores to it are ignored)
+void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size, bool writable = true);
 uint8_t** get_sh2_pagetable();
+uint8_t** get_sh2_write_pagetable();
 
 }

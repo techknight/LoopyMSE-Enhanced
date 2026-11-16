@@ -158,6 +158,13 @@ struct VDP
 	//DMA ctrl registers - 0x0C05Exxx
 	uint16_t dma_mask;
 	uint16_t dma_value;
+
+	//Registers kept as written so they read back (and read-modify-writes work)
+	uint16_t irq_ctrl_raw;
+	uint16_t capture_ctrl_raw;
+	uint16_t bm_mem_ctrl;  //0x0C05E000: bit 0 is the bitmap fast mode
+	uint16_t sync_calibrate;  //0x0C060000, write-only on hardware
+	uint16_t video_debug[2];  //0x0C060002/4, not used by games
 };
 
 extern VDP vdp;

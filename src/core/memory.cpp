@@ -14,6 +14,8 @@ constexpr static int SH2_REGION_SIZE = 1 << 24;
 struct State
 {
 	std::vector<uint8_t*> sh2_pagetable;
+	//Writes use their own table, without the ROMs: a store to ROM is ignored
+	std::vector<uint8_t*> sh2_write_pagetable;
 
 	uint8_t bios[BIOS_SIZE];
 	uint8_t ram[RAM_SIZE];
@@ -40,8 +42,10 @@ void initialize(std::vector<uint8_t>& bios_rom)
 
 	state->sh2_pagetable.resize(SH2_PAGETABLE_SIZE);
 	std::fill(state->sh2_pagetable.begin(), state->sh2_pagetable.end(), nullptr);
+	state->sh2_write_pagetable.resize(SH2_PAGETABLE_SIZE);
+	std::fill(state->sh2_write_pagetable.begin(), state->sh2_write_pagetable.end(), nullptr);
 
-	map_sh2_pagetable(state->bios, BIOS_START, BIOS_SIZE);
+	map_sh2_pagetable(state->bios, BIOS_START, BIOS_SIZE, false);
 
 	//Mirror RAM to its entire region
 	for (int i = 0; i < SH2_REGION_SIZE; i += RAM_SIZE)
@@ -57,14 +61,23 @@ void shutdown()
 	state = nullptr;
 }
 
-void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size)
+void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size, bool writable)
 {
 	map_pagetable(state->sh2_pagetable, data, start, size);
+	if (writable)
+	{
+		map_pagetable(state->sh2_write_pagetable, data, start, size);
+	}
 }
 
 uint8_t** get_sh2_pagetable()
 {
 	return state->sh2_pagetable.data();
+}
+
+uint8_t** get_sh2_write_pagetable()
+{
+	return state->sh2_write_pagetable.data();
 }
 
 void save_state(::State::Writer& w)

@@ -57,6 +57,9 @@ constexpr static int DMA_CTRL_END = 0x0405F000;
 constexpr static int DMA_START = 0x0405F000;
 constexpr static int DMA_END = 0x04060000;
 
+constexpr static int SYSCTL_START = 0x04060000;
+constexpr static int SYSCTL_END = 0x04060010;
+
 constexpr static int OBJ_COUNT = 128;
 
 void initialize();
@@ -158,5 +161,13 @@ uint32_t dma_read32(uint32_t addr);
 void dma_write8(uint32_t addr, uint8_t value);
 void dma_write16(uint32_t addr, uint16_t value);
 void dma_write32(uint32_t addr, uint32_t value);
+
+uint8_t sysctl_read8(uint32_t addr);
+uint16_t sysctl_read16(uint32_t addr);
+uint32_t sysctl_read32(uint32_t addr);
+
+void sysctl_write8(uint32_t addr, uint8_t value);
+void sysctl_write16(uint32_t addr, uint16_t value);
+void sysctl_write32(uint32_t addr, uint32_t value);
 
 }  // namespace Video

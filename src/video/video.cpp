@@ -911,10 +911,52 @@ uint16_t display_read16(uint32_t addr)
 		return vdp.backdrops[1];
 	case 0x008:
 		return vdp.backdrops[0];
+	case 0x00A:
+		return vdp.capture_ctrl_raw;
 	default:
 		Log::unimplemented("[Video] read16 display register %03X", addr & 0xFFF);
 		return 0;
 	}
+}
+
+//Sync calibration and the raster debug controls at 0x0C060000-0x0C060005: the
+//BIOS writes 2 to SYNC_CALIBRATE at boot (it moves the picture against sync,
+//which an emulator can ignore); games do not use the debug controls.
+uint8_t sysctl_read8(uint32_t addr)
+{
+	READ_HALFWORD(sysctl, addr);
+}
+
+uint16_t sysctl_read16(uint32_t addr)
+{
+	addr &= 0xE;
+	if (addr == 0x2) return vdp.video_debug[0];
+	if (addr == 0x4) return vdp.video_debug[1];
+	return 0;
+}
+
+uint32_t sysctl_read32(uint32_t addr)
+{
+	READ_DOUBLEWORD(sysctl, addr);
+}
+
+void sysctl_write8(uint32_t addr, uint8_t value)
+{
+	WRITE_HALFWORD(sysctl, addr, value);
+}
+
+void sysctl_write16(uint32_t addr, uint16_t value)
+{
+	addr &= 0xE;
+	if (addr == 0x0) vdp.sync_calibrate = value;
+	else if (addr == 0x2) vdp.video_debug[0] = value;
+	else if (addr == 0x4) vdp.video_debug[1] = value;
+	if (addr != 0x0 && value) Log::unimplemented("[Video] raster debug register %X: %04X", addr, value);
+}
+
+void sysctl_write32(uint32_t addr, uint32_t value)
+{
+	WRITE_DOUBLEWORD(sysctl, addr, value);
 }
 
 uint32_t display_read32(uint32_t addr)
@@ -970,6 +1012,7 @@ void display_write16(uint32_t addr, uint16_t value)
 		vdp.backdrops[0] = value;
 		break;
 	case 0x00A:
+		vdp.capture_ctrl_raw = value;
 		vdp.capture_ctrl.scanline = value & 0xFF;
 		vdp.capture_ctrl.format = (value >> 8) & 0x3;
 		break;
@@ -994,6 +1037,8 @@ uint16_t irq_read16(uint32_t addr)
 
 	switch (addr)
 	{
+	case 0x000:
+		return vdp.irq_ctrl_raw;
 	case 0x002:
 		return vdp.irq0_hcmp;
 	case 0x004:
@@ -1022,6 +1067,7 @@ void irq_write16(uint32_t addr, uint16_t value)
 	{
 	case 0x000:
 		//TODO: emulate IRQ0, a screen position compare interrupt (no game uses it, but homebrew might)
+		vdp.irq_ctrl_raw = value;
 		vdp.cmp_irq_ctrl.irq0_enable = (value >> 1) & 0x1;
 		vdp.cmp_irq_ctrl.nmi_enable = (value >> 2) & 0x1;
 		vdp.cmp_irq_ctrl.use_vcmp = (value >> 5) & 0x1;
@@ -1034,6 +1080,8 @@ void irq_write16(uint32_t addr, uint16_t value)
 	case 0x004:
 		vdp.irq0_vcmp = value & 0x1FF;
 		break;
+	default:
+		Log::unimplemented("[Video] write16 IRQ register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -1052,6 +1100,8 @@ uint16_t dma_ctrl_read16(uint32_t addr)
 	addr &= 0xFFE;
 	switch (addr)
 	{
+	case 0x000:
+		return vdp.bm_mem_ctrl;
 	case 0x002:
 		return vdp.dma_mask;
 	case 0x004:
@@ -1078,7 +1128,10 @@ void dma_ctrl_write16(uint32_t addr, uint16_t value)
 	switch (addr)
 	{
 	case 0x000:
-		Log::debug("[Video] write dma ctrl 000: %04X", value);
+		//BM_MEM_CTRL: bit 0 speeds up bitmap memory access (the BIOS sets 3);
+		//only the console timing model uses it
+		Log::debug("[Video] write BM_MEM_CTRL: %04X", value);
+		vdp.bm_mem_ctrl = value;
 		break;
 	case 0x002:
 		//TODO: what does bit 8 do? Seems to have no effect in HW tests at this time

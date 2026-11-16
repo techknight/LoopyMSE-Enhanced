@@ -1,5 +1,6 @@
 #include "printer/printer.h"
 
+#include <core/loopy_io.h>
 #include <core/sh2/sh2_bus.h>
 #include <core/sh2/sh2_local.h>
 #include <log/log.h>
@@ -138,28 +139,47 @@ bool motor_move_hook(uint32_t addr)
 	return true;
 }
 
+//Reads for the hooks: a byte at a time, so they never look like misaligned
+//CPU accesses (address errors) or count in the timing model
+static uint16_t peek16(uint32_t addr)
+{
+	return (Bus::read8(addr) << 8) | Bus::read8(addr + 1);
+}
+
+static uint32_t peek32(uint32_t addr)
+{
+	return ((uint32_t)peek16(addr) << 16) | peek16(addr + 2);
+}
+
 bool print_hook(uint32_t addr)
 {
 	//Hook the BIOS print function entry point
 	if (addr != ADDR_PRINT) return false;
 
 	uint32_t sp = sh2.gpr[15];
-	uint32_t p1_data = Bus::read32(sh2.gpr[4]);
-	uint32_t p2_palette = Bus::read32(sh2.gpr[5]);
-	uint32_t p3_dims = Bus::read32(sh2.gpr[6]);
+	uint32_t p1_data = peek32(sh2.gpr[4]);
+	uint32_t p2_palette = peek32(sh2.gpr[5]);
+	uint32_t p3_dims = peek32(sh2.gpr[6]);
 	uint32_t p4_unk = sh2.gpr[7];
-	uint32_t p5_unk = Bus::read32(sp);
-	uint32_t p6_format = Bus::read8(Bus::read32(sp + 4));
-	uint32_t p7_unk = Bus::read32(sp + 8);
-	uint32_t p8_first = Bus::read32(sp + 12);
+	uint32_t p5_unk = peek32(sp);  //print mode in the low byte
+	uint32_t p6_format = Bus::read8(peek32(sp + 4));
+	uint32_t p7_unk = peek32(sp + 8);
+	uint32_t p8_first = peek32(sp + 12);
 	Log::debug(
 		"[Printer] data=%08X, palette=%08X, dims=%08X, unkp4=%08X, unkp5=%08X, format=%02X, unkp7=%08X, first=%d",
 		p1_data, p2_palette, p3_dims, p4_unk, p5_unk, p6_format, p7_unk, p8_first
 	);
 
-	if (output_dir.empty())
+	//Without a sticker cassette, or with a print mode outside 1-4, the BIOS
+	//returns 2 before printing anything
+	int print_mode = p5_unk & 0xF;
+	if (output_dir.empty() || LoopyIO::get_seal_cassette() == 0 || print_mode < 1 || print_mode > 4)
 	{
-		//Nowhere to save; return no-seal status, go to end of function (rts / _mov.l) after this instruction
+		if (!output_dir.empty())
+		{
+			Log::info("[Printer] %s: nothing printed", print_mode < 1 || print_mode > 4 ? "invalid print mode" : "no sticker cassette");
+		}
+		//Return no-seal status, go to end of function (rts / _mov.l) after this instruction
 		sh2.gpr[0] = PRINT_STATUS_NO_SEAL_CART;
 		sh2.pc = ADDR_PRINT_RETURN;
 		sh2.pipeline_valid = false;
@@ -198,7 +218,7 @@ bool print_hook(uint32_t addr)
 			}
 			for (int p = 0; p < 256; p++)
 			{
-				palette[p] = Bus::read16(p2_palette + (p * 2));
+				palette[p] = peek16(p2_palette + (p * 2));
 			}
 
 			if (pixel_double == 1)
@@ -222,7 +242,7 @@ bool print_hook(uint32_t addr)
 
 			for (int i = 0; i < (width * height); i++)
 			{
-				data[i] = Bus::read16(p1_data + (i * 2));
+				data[i] = peek16(p1_data + (i * 2));
 			}
 
 			if (pixel_double == 1)
@@ -260,10 +280,16 @@ bool print_hook(uint32_t addr)
 		print_success = false;
 	}
 
-	if (print_success && DELAYED_RETURN)
+	//Mode 4 would reach the BIOS's print bursts, which wait for a DMA paced by
+	//timer compare matches that is not emulated: finish it here instead
+	if (print_success && DELAYED_RETURN && print_mode != 4)
 	{
 		//Continue the real function; replace return value with success later in return hook
 		return false;
+	}
+	if (print_success && print_mode == 4)
+	{
+		show_print_file(last_printed_path);
 	}
 
 	//Return appropriate status, go to end of function (rts / _mov.l) after this instruction
@@ -283,8 +309,13 @@ bool print_return_hook(uint32_t addr)
 		show_print_file(last_printed_path);
 	}
 
-	//Return success status, continue execution
-	sh2.gpr[0] = PRINT_STATUS_SUCCESS;
+	//The real function ran without a sheet moving past its sensors, so its
+	//sensor and mark errors (1, 4) mean nothing here: report success, but keep
+	//a cancel by the player (3)
+	if (sh2.gpr[0] != PRINT_STATUS_CANCELLED)
+	{
+		sh2.gpr[0] = PRINT_STATUS_SUCCESS;
+	}
 	return false;
 }
 
