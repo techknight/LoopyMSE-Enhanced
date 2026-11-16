@@ -1,0 +1,41 @@
+[INFO] Located BIOS at C:\Users\techk\AppData\Local\Temp\claude\d601d3e25c1be02b\3f79a2fc-c42c-47c9-8d27-f5310bcc97b2\scratchpad\roms\bios.bin
+[INFO] Located Sound BIOS at C:\Users\techk\AppData\Local\Temp\claude\d601d3e25c1be02b\3f79a2fc-c42c-47c9-8d27-f5310bcc97b2\scratchpad\roms\soundbios.bin
+[INFO] [Printer] skipping motor move...
+[INFO] [Printer] skipping motor move...
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\02-frame.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\03-hv240.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\04-hv224.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\05-memory.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-1.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-2.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-3.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-4.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-5.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-6.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\06-raster-7.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\11-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\11-idle.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\12-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\12-circles.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\13-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\13-left.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\14-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\14-right.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\15-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\15-both.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\16-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\16-fast-right.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\17-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\17-overflow-right.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\18-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\18-fast-left.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\19-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\19-overflow-left.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\20-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\20-scan-both.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\21-prompt.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\21-scan-mouse.png
+[INFO] [Automation] screenshot G:\LoopyMSE-Enhanced\probe\results\emulator\99-done.png
+[INFO] [Automation] dumped sram (32768 bytes) to G:\LoopyMSE-Enhanced\probe\results\emulator\probe-sram.bin
+[INFO] Exiting at frame 7550: G:\LoopyMSE-Enhanced\probe\emulator-script.txt: exit
+[INFO] [Automation] G:\LoopyMSE-Enhanced\probe\emulator-script.txt finished at frame 7550

@@ -25,4 +25,6 @@ the control channel, exit codes and the pitfalls. Run unattended and hidden
 - Report unimplemented hardware with `Log::unimplemented`, not `assert`.
 - New per-module state belongs in that module's `save_state`/`load_state`
   (savestates), and scheduled events must carry plain values, not pointers.
-- Never commit BIOS files, ROMs or save files.
+- Never commit BIOS files, game ROMs or game save files. The exception is
+  `probe/`: its own ROM (`LoopyProbe.bin`) and the save files under
+  `probe/results/`, which are the measurements.

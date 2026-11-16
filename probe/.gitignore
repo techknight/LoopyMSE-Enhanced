@@ -1,0 +1,9 @@
+# Build output (LoopyProbe.bin itself is kept: it is the ROM to flash)
+/obj/
+/LoopyProbe.elf
+
+# The results' save files and dumps are kept: they are the measurements
+results/**/*.state
+
+__pycache__/
+*.pyc
