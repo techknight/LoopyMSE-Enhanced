@@ -1,0 +1,22 @@
+# An example automation script (see docs/automation.md).
+# Run it with:  LoopyMSE game.bin --script example-script.txt --hidden --fast --out results
+
+# Let the BIOS and the title screen come up, then press Start
+@300 press start
+shot after-start
+
+# Wait two seconds, press A for 10 frames, and keep the picture
++120 press a 10
++30  shot after-a
+
+# Save the machine here, so later runs can start from this point
+save-state after-a.state
+
+# Wait (at most a minute) for a variable the game keeps in work RAM, then
+# check it. 0x09001234 is a placeholder: use an address from your program's
+# map file (or one found with "dump ram").
+wait-until mem.b 0x09001234 != 0 timeout 3600
+assert mem.b 0x09001234 != 0 "the game never got going"
+
+echo "done"
+exit 0
