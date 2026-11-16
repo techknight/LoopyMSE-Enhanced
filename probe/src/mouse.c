@@ -323,12 +323,15 @@ void TestMouse(void)
 	       "LIFT, PUT DOWN RIGHT, REPEAT");
 	Blind(PH_OVF_LEFT, W_OVF);
 
+	// The person does the same in both: only the probe's scan setting
+	// differs (pad and mouse scan, then mouse scan alone), so the screens
+	// do not mention it.
 	ScreenScan(1, 1, 1);
 	Prompt(PH_SCAN_BOTH, "MOVE AROUND", "DURING THE COUNTDOWN, START MOVING THE",
-	       "MOUSE AROUND STEADILY (PAD SCAN ON TOO)");
+	       "MOUSE AROUND UNTIL THE NEXT SCREEN");
 	Deltas(PH_SCAN_BOTH, W_SCAN);
 	ScreenScan(1, 0, 1);
-	Prompt(PH_SCAN_MOUSE, "MOVE AROUND", "THE SAME AGAIN, STEADILY",
-	       "(MOUSE SCAN ALONE)");
+	Prompt(PH_SCAN_MOUSE, "MOVE AROUND", "THE SAME AGAIN, UNTIL THE NEXT SCREEN",
+	       "(THE PROBE CHANGES A SETTING, NOT YOU)");
 	Deltas(PH_SCAN_MOUSE, W_SCAN);
 }
