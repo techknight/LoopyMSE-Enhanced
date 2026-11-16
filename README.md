@@ -53,4 +53,3 @@ LoopyMSE game.bin --script route.txt --hidden --fast --out results
 * kasami - reverse engineering, accuracy improvements, bug fixes, sound & printer implementation, BIOS dumping
 * partlyhuman - continued development, testing, automated builds, visual and quality-of-life improvements
 * UBCH discord server - documentation and archival, translations, moral support
-* techknight - LoopyMSE-Enhanced: mouse emulation from hardware measurements, automation, profiling and timing model
