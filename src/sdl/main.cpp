@@ -1063,7 +1063,10 @@ int main(int argc, char** argv)
 		return save_state_file(output_file(name), error);
 	};
 	hooks.load_state = [](const std::string& name, std::string& error) {
-		return load_state_file(name, error);
+		// A relative name is looked up where save-state writes it (paths.output) first
+		std::error_code ec;
+		fs::path in_output = output_file(name);
+		return load_state_file(fs::exists(in_output, ec) ? in_output : fs::path(name), error);
 	};
 	Automation::initialize(hooks);
 	Automation::set_scheduled_shots(args.shot_every, args.shot_at);
