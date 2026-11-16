@@ -3,7 +3,9 @@
 #include <common/wordops.h>
 #include <core/loopy_io.h>
 #include <core/memory.h>
+#include <core/sh2/peripherals/sh2_dmac.h>
 #include <core/sh2/peripherals/sh2_intc.h>
+#include <core/sh2/sh2_local.h>
 #include <core/timing.h>
 #include <log/log.h>
 
@@ -25,6 +27,63 @@ static Timing::EventHandle vcount_ev, hsync_ev;
 VDP vdp;
 
 constexpr static int LINES_PER_FRAME = 263;
+constexpr static int CYCLES_PER_LINE = (Timing::F_CPU / 60) / LINES_PER_FRAME;
+
+// Palette and OAM writes while a line is being drawn put dots on the picture
+// of a real console; the emulator draws them clean. With raster warnings on,
+// such writes are counted and reported once a frame.
+static bool raster_warn = false;
+struct RasterReport
+{
+	int palette = 0;
+	int oam = 0;
+	int first_line = -1;
+	uint32_t first_pc = 0;
+	const char* first_kind = "";
+};
+static RasterReport raster;
+
+static inline void note_raster_write(bool is_palette)
+{
+	if (!raster_warn) return;
+	if (vdp.vcount >= vdp.visible_scanlines || (vdp.hcount & 0x100)) return;
+	if (raster.first_line < 0)
+	{
+		raster.first_line = vdp.vcount;
+		raster.first_pc = SH2::OCPM::DMAC::is_dma_access() ? 0 : SH2::sh2.executing_addr;
+		raster.first_kind = is_palette ? "palette" : "OAM";
+	}
+	(is_palette ? raster.palette : raster.oam)++;
+}
+
+static void report_raster_writes()
+{
+	if (raster.first_line >= 0)
+	{
+		Log::warn(
+			"[Raster] %d palette and %d OAM writes during active display; first: %s on line %d by %s %08X",
+			raster.palette, raster.oam, raster.first_kind, raster.first_line,
+			raster.first_pc ? "pc" : "DMA", raster.first_pc
+		);
+	}
+	raster = {};
+}
+
+void set_raster_warnings(bool enabled)
+{
+	raster_warn = enabled;
+	raster = {};
+}
+
+int get_vcount()
+{
+	return vdp.vcount;
+}
+
+double get_frame_rate()
+{
+	return (double)Timing::F_CPU / (CYCLES_PER_LINE * LINES_PER_FRAME);
+}
 
 struct DumpHeader
 {
@@ -235,6 +294,7 @@ void initialize()
 	{
 		oam_write32(i, 0x200);
 	}
+	raster = {};
 
 	for (int i = 0; i < 4; i++)
 	{
@@ -264,6 +324,7 @@ void shutdown()
 void start_frame()
 {
 	vdp.frame_ended = false;
+	if (raster_warn) report_raster_writes();
 
 	constexpr static int BUFFER_SIZE = DISPLAY_WIDTH * DISPLAY_HEIGHT;
 
@@ -343,17 +404,20 @@ uint32_t palette_read32(uint32_t addr)
 
 void palette_write8(uint32_t addr, uint8_t value)
 {
+	note_raster_write(true);
 	vdp.palette[addr & 0x1FF] = value;
 }
 
 void palette_write16(uint32_t addr, uint16_t value)
 {
+	note_raster_write(true);
 	value = Common::bswp16(value);
 	memcpy(&vdp.palette[addr & 0x1FE], &value, 2);
 }
 
 void palette_write32(uint32_t addr, uint32_t value)
 {
+	note_raster_write(true);
 	value = Common::bswp32(value);
 	memcpy(&vdp.palette[addr & 0x1FE], &value, 4);
 }
@@ -379,17 +443,20 @@ uint32_t oam_read32(uint32_t addr)
 
 void oam_write8(uint32_t addr, uint8_t value)
 {
+	note_raster_write(false);
 	vdp.oam[addr & 0x1FF] = value;
 }
 
 void oam_write16(uint32_t addr, uint16_t value)
 {
+	note_raster_write(false);
 	value = Common::bswp16(value);
 	memcpy(&vdp.oam[addr & 0x1FE], &value, 2);
 }
 
 void oam_write32(uint32_t addr, uint32_t value)
 {
+	note_raster_write(false);
 	value = Common::bswp32(value);
 	memcpy(&vdp.oam[addr & 0x1FE], &value, 4);
 }
@@ -415,17 +482,17 @@ uint32_t capture_read32(uint32_t addr)
 
 void capture_write8(uint32_t addr, uint8_t value)
 {
-	assert(0);
+	Log::unimplemented("[Video] write8 to the capture buffer %08X: %02X", addr, value);
 }
 
 void capture_write16(uint32_t addr, uint16_t value)
 {
-	assert(0);
+	Log::unimplemented("[Video] write16 to the capture buffer %08X: %04X", addr, value);
 }
 
 void capture_write32(uint32_t addr, uint32_t value)
 {
-	assert(0);
+	Log::unimplemented("[Video] write32 to the capture buffer %08X: %08X", addr, value);
 }
 
 uint8_t bitmap_reg_read8(uint32_t addr)
@@ -462,7 +529,7 @@ uint16_t bitmap_reg_read16(uint32_t addr)
 	case 0x050:
 		return layer->buffer_ctrl;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 bitmap register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -525,7 +592,7 @@ void bitmap_reg_write16(uint32_t addr, uint16_t value)
 		layer->buffer_ctrl = value;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] write16 bitmap register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -560,7 +627,7 @@ uint16_t ctrl_read16(uint32_t addr)
 	case 0x004:
 		return vdp.vcount;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 control register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -588,7 +655,7 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 		vdp.mode.mouse_scan = (value >> 3) & 0x1;
 		vdp.mode.pad_scan = (value >> 4) & 0x1;
 		vdp.mode.unk2 = (value >> 5) & 0x1;
-		assert(!vdp.mode.use_pal);
+		if (vdp.mode.use_pal) Log::unimplemented("[Video] PAL mode (MODE %04X)", value);
 
 		vdp.visible_scanlines = (vdp.mode.extra_scanlines) ? 0xF0 : 0xE0;
 		LoopyIO::set_controller_scan_mode(vdp.mode.pad_scan, vdp.mode.mouse_scan);
@@ -621,7 +688,7 @@ void ctrl_write16(uint32_t addr, uint16_t value)
 		vdp.sync_irq_ctrl.irq1_source = (value >> 1) & 0x1;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] write16 control register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -676,7 +743,7 @@ uint16_t bgobj_read16(uint32_t addr)
 	case 0x020:
 		return vdp.tilebase;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 BG/OBJ register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -752,7 +819,7 @@ void bgobj_write16(uint32_t addr, uint16_t value)
 		vdp.tilebase = value & 0xFF;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] write16 BG/OBJ register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -809,7 +876,7 @@ uint16_t display_read16(uint32_t addr)
 	case 0x008:
 		return vdp.backdrops[0];
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 display register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -871,7 +938,7 @@ void display_write16(uint32_t addr, uint16_t value)
 		vdp.capture_ctrl.format = (value >> 8) & 0x3;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] write16 display register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -896,7 +963,7 @@ uint16_t irq_read16(uint32_t addr)
 	case 0x004:
 		return vdp.irq0_vcmp;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 IRQ register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -954,7 +1021,7 @@ uint16_t dma_ctrl_read16(uint32_t addr)
 	case 0x004:
 		return vdp.dma_value;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] read16 DMA control register %03X", addr & 0xFFF);
 		return 0;
 	}
 }
@@ -985,7 +1052,7 @@ void dma_ctrl_write16(uint32_t addr, uint16_t value)
 		vdp.dma_value = value & 0xFF;
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Video] write16 DMA control register %03X: %04X", addr & 0xFFF, value);
 	}
 }
 
@@ -996,19 +1063,19 @@ void dma_ctrl_write32(uint32_t addr, uint32_t value)
 
 uint8_t dma_read8(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Video] read8 from the DMA fill port %08X", addr);
 	return 0;
 }
 
 uint16_t dma_read16(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Video] read16 from the DMA fill port %08X", addr);
 	return 0;
 }
 
 uint32_t dma_read32(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Video] read32 from the DMA fill port %08X", addr);
 	return 0;
 }
 

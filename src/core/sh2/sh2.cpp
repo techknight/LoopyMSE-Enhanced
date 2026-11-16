@@ -255,6 +255,7 @@ void run()
 			//Execute whatever just came off the pipeline
 			bool was_delay_slot = sh2.in_delay_slot;
 			bool was_nointerrupt_slot = sh2.in_nointerrupt_slot;
+			sh2.executing_addr = execute_src_addr;
 			if (execute_valid && Cost::enabled)
 			{
 				// Console timing: fetch, then the data accesses in order (the

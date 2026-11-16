@@ -48,8 +48,6 @@ struct Timer
 			return;
 		}
 
-		assert(!(ctrl.clock & ~0x3));
-
 		int64_t time_elapsed = Timing::get_timestamp(Timing::CPU_TIMER) - time_when_started;
 		counter = counter_when_started + (time_elapsed >> ctrl.clock);
 		counter &= 0xFFFF;
@@ -71,9 +69,9 @@ struct Timer
 
 	void start()
 	{
-		assert(!(ctrl.clock & ~0x3));
-		assert(!ctrl.edge_mode);
-		assert(ctrl.clear_mode != 3);
+		if (ctrl.clock & ~0x3) Log::unimplemented("[Timer] timer%d external clock %d", id, ctrl.clock);
+		if (ctrl.edge_mode) Log::unimplemented("[Timer] timer%d clock edge mode %d", id, ctrl.edge_mode);
+		if (ctrl.clear_mode == 3) Log::unimplemented("[Timer] timer%d synchronous clear", id);
 
 		//Calculate the target which will take the smallest amount of time to reach
 		constexpr static uint32_t OVERFLOW_TARGET = 0x10000;
@@ -261,7 +259,7 @@ uint8_t read8(uint32_t addr)
 			return (reg & 1) ? (gr & 0xFF) : (gr >> 8);
 		}
 		default:
-			assert(0);
+			Log::unimplemented("[Timer] read8 timer%d register %02X", timer->id, reg);
 			return 0;
 		}
 	}
@@ -275,7 +273,7 @@ uint8_t read8(uint32_t addr)
 	case 0x02:
 		return state.mode;
 	default:
-		assert(0);
+		Log::unimplemented("[Timer] read8 shared register %02X", reg);
 		return 0;
 	}
 }
@@ -304,7 +302,7 @@ uint16_t read16(uint32_t addr)
 			break;
 		}
 	}
-	assert(0);
+	Log::unimplemented("[Timer] read16 %s register %02X", timer ? "timer" : "shared", reg);
 	return 0;
 }
 
@@ -358,7 +356,7 @@ void write8(uint32_t addr, uint8_t value)
 			update_timer_target(timer);
 			break;
 		default:
-			assert(0);
+			Log::unimplemented("[Timer] write8 timer%d register %02X: %02X", timer->id, reg, value);
 		}
 
 		return;
@@ -378,15 +376,15 @@ void write8(uint32_t addr, uint8_t value)
 	case 0x01:
 		Log::debug("[Timer] write sync ctrl: %02X", value);
 		state.sync_ctrl = value & 0x1F;
-		assert(!state.sync_ctrl);
+		if (state.sync_ctrl) Log::unimplemented("[Timer] synchronized timers (TSNC %02X)", value);
 		break;
 	case 0x02:
 		Log::debug("[Timer] write mode: %02X", value);
 		state.mode = value & 0x7F;
-		assert(!state.mode);
+		if (state.mode) Log::unimplemented("[Timer] PWM / phase counting modes (TMDR %02X)", value);
 		break;
 	default:
-		assert(0);
+		Log::unimplemented("[Timer] write8 shared register %02X: %02X", reg, value);
 	}
 }
 
@@ -415,17 +413,13 @@ void write16(uint32_t addr, uint16_t value)
 			update_timer_target(timer);
 			break;
 		default:
-			assert(0);
+			Log::unimplemented("[Timer] write16 timer%d register %02X: %04X", timer->id, reg, value);
 		}
 
 		return;
 	}
 
-	switch (reg)
-	{
-	default:
-		assert(0);
-	}
+	Log::unimplemented("[Timer] write16 shared register %02X: %04X", reg, value);
 }
 
 }  // namespace SH2::OCPM::Timer

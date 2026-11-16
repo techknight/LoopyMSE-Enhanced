@@ -43,6 +43,11 @@ static int buffer_size;
 static bool mute = false;
 static float volume_level;	// Automatically managed by mute
 
+// With output off no audio device is opened and no samples are made, but the
+// time reference events are still scheduled, so emulation timing is the same
+// as with sound.
+static bool output_enabled = true;
+
 static void buffer_callback(float* buffer, uint32_t count);
 
 /* SDL-specific code start */
@@ -122,22 +127,30 @@ static void sdl_audio_shutdown()
 {
 	// Close audio device
 	if (audio_device) SDL_CloseAudioDevice(audio_device);
+	audio_device = 0;
 }
 
 /* SDL-specific code end */
 
 static void timeref(uint64_t param, int cycles_late);
 
+void set_output_enabled(bool enabled)
+{
+	output_enabled = enabled;
+}
+
 void initialize(std::vector<uint8_t>& sound_rom)
 {
 	if (!sound_rom.empty())
 	{
-		if (!sdl_audio_initialize())
+		if (output_enabled)
 		{
-			return;
+			if (!sdl_audio_initialize())
+			{
+				return;
+			}
+			sound_engine = std::make_unique<LoopySound::LoopySound>(sound_rom, (float)sample_rate, buffer_size);
 		}
-
-		sound_engine = std::make_unique<LoopySound::LoopySound>(sound_rom, (float)sample_rate, buffer_size);
 
 		if (TIMEREF_ENABLE)
 		{
@@ -162,25 +175,25 @@ void shutdown()
 
 uint8_t ctrl_read8(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Sound] read8 %08X", addr);
 	return 0;
 }
 
 uint16_t ctrl_read16(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Sound] read16 %08X", addr);
 	return 0;
 }
 
 uint32_t ctrl_read32(uint32_t addr)
 {
-	assert(0);
+	Log::unimplemented("[Sound] read32 %08X", addr);
 	return 0;
 }
 
 void ctrl_write8(uint32_t addr, uint8_t value)
 {
-	assert(0);
+	Log::unimplemented("[Sound] write8 %08X: %02X", addr, value);
 }
 
 void ctrl_write16(uint32_t addr, uint16_t value)
@@ -220,7 +233,7 @@ static void timeref(uint64_t param, int cycles_late)
 	timeref_ev = Timing::add_event(timeref_func, timeref_cycles, 0, Timing::CPU_TIMER);
 
 	constexpr static float timeref_period = 1.f / TIMEREF_FREQUENCY;
-	sound_engine->time_reference(timeref_period);
+	if (sound_engine) sound_engine->time_reference(timeref_period);
 }
 
 static void update_volume_level()
@@ -265,6 +278,7 @@ static void buffer_callback(float* sample_buffer, uint32_t sample_count)
 
 void wav_queue(std::string path, float volume)
 {
+	if (!audio_device) return;
 	wav_volume = SDL_clamp(volume, 0, 1);
 
 	SDL_AudioSpec spec;

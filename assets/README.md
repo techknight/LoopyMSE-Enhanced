@@ -1,4 +1,4 @@
-# Loopy My Seal Emulator
+# LoopyMSE-Enhanced
 
 ## Prerequisites
 
@@ -18,6 +18,8 @@ Find the configuration `loopymse.ini` either:
 - In `~/Library/Application Support/LoopyMSE/LoopyMSE/` on MacOS (after first run)
 
 You can use the settings here to change your keyboard or controller bindings as well as certain options.
+Any setting can also be given on the command line as `--section.key=value`, which wins over the file;
+`LoopyMSE --help-config` lists every setting with its current value, and `--no-ini` ignores the file.
 
 ## Running
 
@@ -32,12 +34,13 @@ You can run LoopyMSE several ways:
 Launching via commandline:
 - On MacOS, the binary is in `LoopyMSE.app/Contents/MacOS/LoopyMSE`.
 - Use `LoopyMSE --help` for information on commandline parameters.
+- For scripted, unattended or remote-controlled runs, see `docs/automation.md` in the source repository.
 
 ## Playing Loopy My Seal Emulator
 
 You can use the keyboard or a gamepad / controller to emulate controller input.
 
-The Loopy Mouse is also emulated. Press F2 (or set `mouse=true` in `loopymse.ini`) to plug it in; as on real hardware, the gamepad is disconnected while the mouse is plugged in. Click the window to capture your mouse and start playing, and press F2 again to release it. Press F1 to plug the gamepad back in. Games that only check for the mouse at startup may need a reboot (F12) after plugging it in.
+The Loopy Mouse is also emulated. With `[input] device=auto` (the default), the mouse is plugged in at startup for the games known to use it: Pasocom Collection, Loopy Town no Oheya ga Hoshii!, Little Romance, Lupiton no Wonder Palette and Chakrakun no Omajinai Paradise. Use `device=mouse` or `device=pad` to choose yourself. At any time F2 plugs in the mouse and F1 the gamepad; as on real hardware, the gamepad is disconnected while the mouse is plugged in. Click the window to capture your mouse and start playing, and press F2 again to release it. Games that only check for the mouse at startup may need a reboot (F12) after plugging it in.
 
 Default controls (remap in `loopymse.ini`):
 
@@ -64,7 +67,9 @@ Additionally, these special functions are available.
 | Reboot          | F12          |
 | Exit            | Esc          |
 
-Screenshots are saved in the same directory as the loaded ROM, or in the same directory as `loopymse.ini` if the ROM directory is not available for some reason. By default, both raw unscaled and aspect ratio corrected images are exported.
+Screenshots are saved in the same directory as the loaded ROM (or in `[paths] screenshots` / `output` when set). By default, both raw unscaled and aspect ratio corrected images are exported.
+
+The game's save (SRAM) is kept in `<rom name>.sav` beside the ROM, or in `[paths] output`, or in the file named by `[cart] sram`. It is written whenever it changes, checked once a second, and when the emulator closes.
 
 ## Printing
 

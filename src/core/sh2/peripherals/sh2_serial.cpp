@@ -9,6 +9,7 @@
 
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/timing.h"
+#include "core/watch.h"
 
 namespace SH2::OCPM::Serial
 {
@@ -68,7 +69,7 @@ struct Port
 
 	void calc_cycles_per_bit()
 	{
-		assert(!mode.sync_mode);
+		if (mode.sync_mode) Log::unimplemented("[Serial] port%d clocked synchronous mode", id);
 		cycles_per_bit = (32 << (mode.clock_factor * 2)) * (bit_factor + 1);
 	}
 
@@ -124,6 +125,7 @@ static void tx_event(uint64_t param, int cycles_late)
 		{
 			port->tx_callback(port->tx_prepared_data);
 		}
+		Watch::on_serial(port->id, port->tx_prepared_data);
 
 		if (!port->status.tx_empty)
 		{
@@ -198,7 +200,10 @@ void write8(uint32_t addr, uint8_t value)
 		port->mode.parity_enable = (value >> 5) & 0x1;
 		port->mode.seven_bit_mode = (value >> 6) & 0x1;
 		port->mode.sync_mode = (value >> 7) & 0x1;
-		assert(!(value & ~0x3));
+		if (value & ~0x3)
+		{
+			Log::unimplemented("[Serial] port%d mode %02X (only 8N1 asynchronous is emulated)", port->id, value);
+		}
 		break;
 	case 0x01:
 		Log::debug("[Serial] write port%d bitrate factor: %02X", port->id, value);
@@ -265,7 +270,7 @@ void write8(uint32_t addr, uint8_t value)
 		break;
 	}
 	default:
-		assert(0);
+		Log::unimplemented("[Serial] write port%d register %d: %02X", port->id, reg, value);
 	}
 }
 

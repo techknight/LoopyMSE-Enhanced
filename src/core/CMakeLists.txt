@@ -10,6 +10,8 @@ add_library (core STATIC
 			 "system.h"
 			 "timing.cpp"
 			 "timing.h"
+			 "watch.cpp"
+			 "watch.h"
 
 			 "sh2/sh2.cpp"
 			 "sh2/sh2.h"

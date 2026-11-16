@@ -1,6 +1,8 @@
 #include <common/wordops.h>
 #include <core/loopy_io.h>
+#include <core/sh2/sh2_local.h>
 #include <log/log.h>
+#include <video/video.h>
 
 #include <algorithm>
 #include <cassert>
@@ -65,7 +67,44 @@ uint8_t reg_read8(uint32_t addr)
 	READ_HALFWORD(reg, addr);
 }
 
+static uint16_t read16_impl(uint32_t addr);
+static void write16_impl(uint32_t addr, uint16_t value);
+
+//Log every register access (debug.trace_io): which scan mode a game arms,
+//what it reads from the pad and mouse registers, and from where.
+static bool trace = false;
+
+void set_trace(bool enabled)
+{
+	trace = enabled;
+}
+
 uint16_t reg_read16(uint32_t addr)
+{
+	uint16_t value = read16_impl(addr);
+	if (trace)
+	{
+		Log::info(
+			"[IO trace] read  %03X -> %04X  line %3d pc %08X", addr & 0xFFE, value, Video::get_vcount(),
+			SH2::sh2.executing_addr
+		);
+	}
+	return value;
+}
+
+void reg_write16(uint32_t addr, uint16_t value)
+{
+	if (trace)
+	{
+		Log::info(
+			"[IO trace] write %03X <- %04X  line %3d pc %08X", addr & 0xFFE, value, Video::get_vcount(),
+			SH2::sh2.executing_addr
+		);
+	}
+	write16_impl(addr, value);
+}
+
+static uint16_t read16_impl(uint32_t addr)
 {
 	addr &= 0xFFE;
 	switch (addr)
@@ -135,7 +174,7 @@ void reg_write8(uint32_t addr, uint8_t value)
 	WRITE_HALFWORD(reg, addr, value);
 }
 
-void reg_write16(uint32_t addr, uint16_t value)
+static void write16_impl(uint32_t addr, uint16_t value)
 {
 	addr &= 0xFFE;
 	switch (addr)

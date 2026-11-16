@@ -14,6 +14,7 @@
 #include "core/sh2/peripherals/sh2_ocpm.h"
 #include "core/sh2/sh2_cost.h"
 #include "core/sh2/sh2_local.h"
+#include "core/watch.h"
 #include "expansion/expansion.h"
 
 namespace SH2::Bus
@@ -139,6 +140,7 @@ void write8(uint32_t addr, uint8_t value)
 {
 	COST(1, true, value);
 	addr = translate_addr(addr);
+	if (Watch::writes_active) Watch::on_write(addr, 1, value);
 	uint8_t* mem = sh2.pagetable[addr >> 12];
 	if (mem)
 	{
@@ -153,6 +155,7 @@ void write16(uint32_t addr, uint16_t value)
 {
 	COST(2, true, value);
 	addr = translate_addr(addr);
+	if (Watch::writes_active) Watch::on_write(addr, 2, value);
 	uint8_t* mem = sh2.pagetable[addr >> 12];
 	if (mem)
 	{
@@ -167,6 +170,7 @@ void write32(uint32_t addr, uint32_t value)
 {
 	COST(4, true, value);
 	addr = translate_addr(addr);
+	if (Watch::writes_active) Watch::on_write(addr, 4, value);
 	uint8_t* mem = sh2.pagetable[addr >> 12];
 	if (mem)
 	{

@@ -31,12 +31,14 @@ next observation corrects).
 Buttons are level-held while the request bit is up: the cartridge sees the
 press edge through the real mouse path, drops the request, and this releases
 -- one edge per request no matter how many frames either side takes.
+
+A script can also name the target itself ("mouse to X Y"): that overrides
+the cartridge's AP_TGT until the cursor arrives. AP_DBG is logged (debug
+level) whenever it changes, so a cartridge can show its own progress.
 */
 #include <input/input.h>
 #include <log/log.h>
 #include <video/video.h>
-
-#include <SDL.h>
 
 #include <cstdint>
 
@@ -46,6 +48,7 @@ namespace Autodrive
 {
 
 static constexpr uint32_t REG_CTL = 0x002;
+static constexpr uint32_t REG_DBG = 0x004;
 static constexpr uint32_t REG_CUR = 0x00A;
 static constexpr uint32_t REG_TGT = 0x00C;
 
@@ -72,14 +75,17 @@ static uint16_t last_cur = 0;
 static bool have_cur = false;
 static int frames_since_inject = 0;
 static int rearm_debt = 0;
+static bool override_target = false;
+static uint16_t override_tgt = 0;
+static int last_dbg = -1;
 
-static void hold_button(int sdl_button, bool* held, bool want)
+static void hold_button(int mouse_button, bool* held, bool want)
 {
 	if (*held == want)
 		return;
-	Input::set_mouse_button_state(sdl_button, want);
+	Input::inject_mouse_buttons(mouse_button, want);
 	*held = want;
-	Log::debug("[Autodrive] %s %s", sdl_button == SDL_BUTTON_LEFT ? "left" : "right", want ? "press" : "release");
+	Log::debug("[Autodrive] %s %s", mouse_button == Input::MOUSE_L ? "left" : "right", want ? "press" : "release");
 }
 
 static int clamp_counts(int counts)
@@ -103,12 +109,24 @@ bool is_enabled()
 
 void reset()
 {
-	hold_button(SDL_BUTTON_LEFT, &held_l, false);
-	hold_button(SDL_BUTTON_RIGHT, &held_r, false);
+	hold_button(Input::MOUSE_L, &held_l, false);
+	hold_button(Input::MOUSE_R, &held_r, false);
 	seen_magic = false;
 	have_cur = false;
 	frames_since_inject = 0;
 	rearm_debt = 0;
+	override_target = false;
+	last_dbg = -1;
+}
+
+bool set_target(int x, int y)
+{
+	if (!enabled || !seen_magic)
+		return false;
+	override_target = true;
+	override_tgt = (uint16_t)(((y & 0xFF) << 8) | (x & 0xFF));
+	Log::debug("[Autodrive] script target (%d,%d)", x & 0xFF, y & 0xFF);
+	return true;
 }
 
 void run_frame()
@@ -120,7 +138,7 @@ void run_frame()
 	if (((ctl >> 8) & 0xF) != CTL_MAGIC)
 	{
 		//Not our cartridge talking (or not yet booted): stay inert.
-		if (held_l || held_r || have_cur)
+		if (held_l || held_r || have_cur || seen_magic)
 			reset();
 		return;
 	}
@@ -131,17 +149,24 @@ void run_frame()
 		Log::info("[Autodrive] cartridge speaking APDRIVE, chasing");
 	}
 
-	hold_button(SDL_BUTTON_LEFT, &held_l, (ctl & CTL_REQ_L) != 0);
-	hold_button(SDL_BUTTON_RIGHT, &held_r, (ctl & CTL_REQ_R) != 0);
+	int dbg = Video::bgobj_read16(REG_DBG);
+	if (dbg != last_dbg)
+	{
+		last_dbg = dbg;
+		Log::debug("[Autodrive] cartridge debug word %03X", dbg);
+	}
 
-	if (!(ctl & CTL_TGT_VALID))
+	hold_button(Input::MOUSE_L, &held_l, (ctl & CTL_REQ_L) != 0);
+	hold_button(Input::MOUSE_R, &held_r, (ctl & CTL_REQ_R) != 0);
+
+	if (!(ctl & CTL_TGT_VALID) && !override_target)
 	{
 		have_cur = false;
 		return;
 	}
 
 	uint16_t cur = Video::bgobj_read16(REG_CUR);
-	uint16_t tgt = Video::bgobj_read16(REG_TGT);
+	uint16_t tgt = override_target ? override_tgt : Video::bgobj_read16(REG_TGT);
 	int dpx = (tgt & 0xFF) - (cur & 0xFF);
 	int dpy = (tgt >> 8) - (cur >> 8);
 
@@ -151,6 +176,11 @@ void run_frame()
 		last_cur = cur;
 		have_cur = true;
 		rearm_debt = 0;
+		if (override_target)
+		{
+			override_target = false;
+			Log::debug("[Autodrive] reached script target");
+		}
 		return;
 	}
 
@@ -164,7 +194,7 @@ void run_frame()
 
 	//Game pixels are counts / 2; the game's ISR negates Y (and the counter
 	//read is what un-negates the SDL convention), so send 2*dpx, -2*dpy.
-	Input::move_mouse(clamp_counts(2 * dpx), clamp_counts(-2 * dpy));
+	Input::inject_mouse_move(clamp_counts(2 * dpx), clamp_counts(-2 * dpy));
 	Log::debug("[Autodrive] chase (%d,%d) -> (%d,%d)", cur & 0xFF, cur >> 8, tgt & 0xFF, tgt >> 8);
 
 	last_cur = cur;

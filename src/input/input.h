@@ -21,6 +21,9 @@ enum PadButton
 	PAD_RIGHT = 0x0800
 };
 
+constexpr int ALL_PAD_BUTTONS =
+	PAD_START | PAD_L1 | PAD_R1 | PAD_A | PAD_B | PAD_C | PAD_D | PAD_UP | PAD_DOWN | PAD_LEFT | PAD_RIGHT;
+
 enum MouseButton
 {
 	MOUSE_L = 0x1000,
@@ -30,17 +33,24 @@ enum MouseButton
 void initialize();
 void shutdown();
 
+// Input from the person at the computer (keyboard, game controller, host
+// mouse). Ignored while automation owns the controls.
 void set_key_state(int key, bool pressed);
 void set_controller_state(int key, bool pressed);
 void set_mouse_button_state(int button, bool pressed);
 void move_mouse(int delta_x, int delta_y);
+void set_user_input_blocked(bool blocked);
+bool is_user_input_blocked();
+
+// Input from automation (scripts, the control channel, autodrive). Always
+// delivered: the whole pad state (PadButton mask), mouse buttons (MouseButton
+// mask) and mouse motion in counts.
+void inject_pad(int buttons);
+void inject_mouse_buttons(int buttons, bool pressed);
+void inject_mouse_move(int delta_x, int delta_y);
+
 void set_mouse_plugged(bool plugged);
 bool is_mouse_plugged();
-
-//Dev automation: in script mode, keyboard/controller pad input is ignored and the pad
-//state is driven only by set_scripted_pad (a mask of PadButton values, PAD_PRESENCE excluded)
-void set_script_mode(bool enabled);
-void set_scripted_pad(int buttons);
 
 void add_key_binding(int key, PadButton pad_button);
 void add_controller_binding(int key, PadButton pad_button);
