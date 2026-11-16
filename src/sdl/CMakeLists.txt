@@ -7,6 +7,8 @@ add_executable (LoopyMSE
     "imgwriter.h"
     "imgwriter.cpp"
     "main.cpp"
+    "recorder.h"
+    "recorder.cpp"
 )
 
 target_link_libraries (LoopyMSE PRIVATE

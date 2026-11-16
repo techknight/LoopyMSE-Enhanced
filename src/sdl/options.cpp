@@ -392,6 +392,13 @@ void register_settings(Registry& r, Args& a)
 	r.add_u64("automation.shot_every", a.shot_every, "Save a screenshot every N frames (0 = never)");
 	r.add_frame_list("automation.shot_at", a.shot_at, "Save screenshots at these frames (comma-separated)");
 
+	r.add_string("record.video", a.record_video, "Record video with sound to this file (.mp4, .mkv; needs ffmpeg)");
+	r.add_string("record.audio", a.record_audio, "Record the sound to this .wav file");
+	r.add_string("record.frames", a.record_frames, "Save every frame as a PNG in this folder");
+	r.add_int("record.scale", a.record_scale, 1, 10, "Video: integer pixel scale");
+	r.add_int("record.quality", a.record_quality, 0, 51, "Video: x264 quality, lower is better (CRF)");
+	r.add_string("record.ffmpeg", a.record_ffmpeg, "ffmpeg program to use for video");
+
 	r.add_string("profile.file", a.profile_file, "Write a CPU profile (cycles per program address) to this file");
 	r.add_u64("profile.from", a.profile_from, "First frame of the profile");
 	r.add_u64("profile.to", a.profile_to, "Frame at which the profile stops and is written");
@@ -431,6 +438,7 @@ const Alias ALIASES[] = {
 	{"strict", "debug.strict", "true", "Fail on unimplemented hardware (exit code 2)"},
 	{"log", "debug.log_file", nullptr, "Write the log to a file"},
 	{"profile", "profile.file", nullptr, "Write a CPU profile to a file"},
+	{"record", "record.video", nullptr, "Record video with sound (needs ffmpeg)"},
 };
 
 const Alias* find_alias(const std::string& name)
