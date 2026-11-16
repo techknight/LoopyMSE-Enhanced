@@ -246,6 +246,20 @@ uint8_t read8(uint32_t addr)
 		{
 		case 0x03:
 			return timer->intr_flag | 0x78;
+		case 0x04:
+		case 0x05:
+			// Byte halves of the counter; hardware latches the low byte on the
+			// high-byte read, which one update per read approximates.
+			timer->update_counter();
+			return (reg == 0x04) ? (timer->counter >> 8) : (timer->counter & 0xFF);
+		case 0x06:
+		case 0x07:
+		case 0x08:
+		case 0x09:
+		{
+			uint32_t gr = timer->gen_reg[(reg - 0x06) >> 1];
+			return (reg & 1) ? (gr & 0xFF) : (gr >> 8);
+		}
 		default:
 			assert(0);
 			return 0;
@@ -268,6 +282,28 @@ uint8_t read8(uint32_t addr)
 
 uint16_t read16(uint32_t addr)
 {
+	// The counter and the general registers, for a program that reads the
+	// time between two compare matches (a fine clock on an ITU channel).
+	TimerDev dev = get_dev_from_addr(addr);
+
+	Timer* timer = std::get<Timer*>(dev);
+	int reg = std::get<int>(dev);
+
+	if (timer)
+	{
+		switch (reg)
+		{
+		case 0x04:
+			timer->update_counter();
+			return (uint16_t)timer->counter;
+		case 0x06:
+			return (uint16_t)timer->gen_reg[0];
+		case 0x08:
+			return (uint16_t)timer->gen_reg[1];
+		default:
+			break;
+		}
+	}
 	assert(0);
 	return 0;
 }
