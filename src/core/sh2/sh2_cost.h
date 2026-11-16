@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include "core/state.h"
+
 // Console timing model ([timing] model = console). Stock LoopyMSE charges an
 // instruction its fetch alone (3 cycles from the cartridge, 1 elsewhere) and
 // nothing for a data access, a literal-pool load or a DMA. With this model on,
@@ -32,6 +34,8 @@ extern bool enabled;
 
 // Forget the open row, the bitmap mode and any owed cycles (power-on).
 void reset();
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 // Cycles a cartridge ROM access takes (fetches, literals and data alike):
 // one state plus the long waits WCR3 sets for area 6 (3 at the BIOS's

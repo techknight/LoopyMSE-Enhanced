@@ -1,8 +1,13 @@
 #pragma once
 #include <cstdint>
 
+#include "core/state.h"
+
 namespace SH2::OCPM::DMAC
 {
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 enum class DREQ
 {

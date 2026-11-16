@@ -137,6 +137,8 @@ Conditions:
 | Command | Effect |
 | --- | --- |
 | `shot [NAME]` | Save a screenshot (in `paths.screenshots`) |
+| `dump WHAT FILE` | Write raw memory: `ram` (work RAM), `sram` (the save), `bitmap` (bitmap VRAM), `tiles` (tile VRAM), `oam`, `palette`, `onchip` |
+| `save-state FILE` / `load-state FILE` | Save or load a savestate (see below) |
 | `assert mem ADDR OP VALUE ["message"]` | End the run with code 4 if the comparison fails |
 | `reboot` | Power-cycle the Loopy (the frame count goes on) |
 | `speed FACTOR` | Change speed (0 = as fast as possible) |
@@ -191,6 +193,55 @@ send("step 120")
 print(send("shot title"))
 send("exit")
 ```
+
+## Savestates
+
+`save-state FILE` in a script (or on the control channel) saves the whole
+machine at that frame boundary; `load-state FILE` or `--load-state FILE` (at
+startup) brings it back, frame number included, so a run started from a state
+continues exactly as the run that saved it. In the window, Shift+F5 to
+Shift+F8 save to slots 1-4 and F5 to F8 load them (files named
+`<rom>.state1` to `.state4`, in `paths.states`, `paths.output` or beside the
+ROM).
+
+A state only loads into the same build of the emulator with the same
+cartridge. The sound synthesizer is not saved: after a load it starts silent
+and picks up from the next notes the game sends, which never affects the game
+itself.
+
+## Recording
+
+| Setting | Meaning |
+| --- | --- |
+| `record.video=FILE` (`--record FILE`) | Video with sound, through ffmpeg: `.mp4`, `.mkv`, ... |
+| `record.audio=FILE` | The sound as a 48 kHz 16-bit stereo `.wav` |
+| `record.frames=DIR` | Every frame as a PNG (no ffmpeg needed) |
+| `record.scale=N` | Video pixel scale (default 3: 768x720) |
+| `record.quality=N` | x264 CRF, lower is better (default 16) |
+| `record.ffmpeg=PATH` | The ffmpeg program (default: `ffmpeg` on the PATH) |
+
+Everything is recorded in emulated time: every emulated frame is one video
+frame at the Loopy's real frame rate, and the sound is rendered in step with
+emulation instead of by the sound card. A recording made hidden at
+`--fast` therefore plays back at normal speed, and two runs of the same
+script give identical files.
+
+```
+LoopyMSE game.bin --script demo.txt --hidden --fast --record demo.mp4
+```
+
+## Debugging
+
+| Setting | Meaning |
+| --- | --- |
+| `debug.serial0_log=FILE`, `debug.serial1_log=FILE` | Everything a serial port sends (port 0: the program's printf; port 1: the MIDI stream to the sound chip) |
+| `debug.serial_log_timed=true` | Write one `FRAME CYCLE BYTE` line per byte instead of raw bytes |
+| `debug.watch_writes=ADDR[:LEN],...` | Log every write to these addresses with the frame, line and program counter |
+| `debug.watch_log=FILE` | Where the watch lines go (default: the log) |
+| `debug.trace_io=true` | Log every pad, mouse and sensor register access |
+| `debug.raster_warnings=true` | Report palette and OAM writes that land on a line being drawn: on a console they show as dots. The emulator's line timing is approximate (DMA, for one, is instant), so treat reports as pointers, not proof |
+| `debug.log_frames=true` | Prefix every log line with the frame number |
+| `debug.strict=true` (`--strict`) | End with exit code 2 at the first use of hardware the emulator does not implement (each kind is logged once as `[UNIMPLEMENTED]`) |
 
 ## CPU profile and timing model
 

@@ -224,4 +224,21 @@ void deassert_irq(IRQ irq)
 	send_irq_signal();
 }
 
+void resend()
+{
+	send_irq_signal();
+}
+
+void save_state(::State::Writer& w)
+{
+	w.section("intc");
+	w.put(state);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("intc");
+	r.get(state);
+}
+
 }

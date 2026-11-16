@@ -1,8 +1,13 @@
 #pragma once
 #include "core/config.h"
+#include "core/state.h"
 
 namespace Cart
 {
+
+// The cartridge's SRAM (the ROM is not part of a savestate)
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int SRAM_START = 0x02000000;
 constexpr static int ROM_START = 0x06000000;

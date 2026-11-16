@@ -649,17 +649,16 @@ void fail(Program& p, const Command& c, uint64_t frame, int code, const std::str
 	if (hooks.exit) hooks.exit(code, message);
 }
 
+// Big-endian, a byte at a time: any address is fine, and the emulated CPU
+// never sees these reads (no address errors, no timing model charges).
 uint32_t read_mem(uint32_t addr, int size)
 {
-	switch (size)
+	uint32_t value = 0;
+	for (int i = 0; i < size; i++)
 	{
-	case 1:
-		return SH2::Bus::read8(addr);
-	case 2:
-		return SH2::Bus::read16(addr);
-	default:
-		return SH2::Bus::read32(addr);
+		value = (value << 8) | SH2::Bus::read8(addr + i);
 	}
+	return value;
 }
 
 bool compare(uint32_t a, Cmp cmp, uint32_t b)

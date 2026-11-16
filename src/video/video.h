@@ -3,8 +3,13 @@
 #include <filesystem>
 #include <string>
 
+#include "core/state.h"
+
 namespace Video
 {
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int DISPLAY_WIDTH = 0x100;
 

@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include "core/sh2/peripherals/sh2_dmac.h"
+#include "core/sh2/peripherals/sh2_intc.h"
 #include "core/sh2/sh2_bus.h"
 #include "core/sh2/sh2_cost.h"
 
@@ -10,6 +11,7 @@ namespace SH2::OCPM::DMAC
 
 struct Channel
 {
+	int id;
 	uint32_t src_addr;
 	uint32_t dst_addr;
 	uint32_t transfer_size;
@@ -54,6 +56,21 @@ struct Channel
 		ctrl.mode = ((value >> 8) & 0xF);
 		ctrl.src_step = (value >> 12) & 0x3;
 		ctrl.dst_step = (value >> 14) & 0x3;
+		update_irq();
+	}
+
+	//DEI: transfer end (TE) with the interrupt enabled (IE), until TE is cleared
+	void update_irq()
+	{
+		auto irq = (INTC::IRQ)((int)INTC::IRQ::DMAC0 + id);
+		if (ctrl.irq_enable && ctrl.finished)
+		{
+			INTC::assert_irq(irq, 0);
+		}
+		else
+		{
+			INTC::deassert_irq(irq);
+		}
 	}
 
 	void start_transfer();
@@ -72,7 +89,6 @@ static bool in_dma_state;
 void Channel::start_transfer()
 {
 	//TODO: time these transfers instead of doing them all at once?
-	if (ctrl.irq_enable) Log::unimplemented("[DMAC] transfer-end interrupt (CHCR bit 2)");
 
 	int src_step = 0;
 	switch (ctrl.src_step)
@@ -142,6 +158,7 @@ void Channel::start_transfer()
 	if (!transfer_size)
 	{
 		ctrl.finished = true;
+		update_irq();
 	}
 }
 
@@ -263,6 +280,7 @@ void initialize()
 {
 	state = {};
 	in_dma_state = false;
+	for (int i = 0; i < 4; i++) state.chan[i].id = i;
 
 	//Auto mode should always go through
 	send_dreq(DREQ::Auto);
@@ -282,6 +300,19 @@ void clear_dreq(DREQ dreq)
 bool is_dma_access()
 {
 	return in_dma_state;
+}
+
+void save_state(::State::Writer& w)
+{
+	w.section("dmac");
+	w.put(state);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("dmac");
+	r.get(state);
+	in_dma_state = false;
 }
 
 }

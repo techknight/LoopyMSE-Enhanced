@@ -86,7 +86,7 @@ struct Timer
 
 		uint32_t cycles = (nearest_target - counter) << ctrl.clock;
 		Timing::UnitCycle sched_cycles = Timing::convert_cpu(cycles);
-		ev = Timing::add_event(ev_func, sched_cycles, (uint64_t)this, Timing::CPU_TIMER);
+		ev = Timing::add_event(ev_func, sched_cycles, (uint64_t)id, Timing::CPU_TIMER);
 
 		time_when_started = Timing::get_timestamp(Timing::CPU_TIMER);
 		counter_when_started = counter;
@@ -141,7 +141,7 @@ static void update_timer_target(Timer* timer)
 static void intr_event(uint64_t param, int cycles_late)
 {
 	assert(!cycles_late);
-	Timer* timer = (Timer*)param;
+	Timer* timer = &state.timers[param];
 
 	timer->update_counter();
 
@@ -229,6 +229,18 @@ void initialize()
 	state.timers[4].irq = INTC::IRQ::ITU4;
 
 	ev_func = Timing::register_func("Timer::intr_event", intr_event);
+}
+
+void save_state(::State::Writer& w)
+{
+	w.section("itu");
+	w.put(state);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("itu");
+	r.get(state);
 }
 
 uint8_t read8(uint32_t addr)

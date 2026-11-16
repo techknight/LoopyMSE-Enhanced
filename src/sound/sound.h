@@ -21,6 +21,8 @@ Game support notes:
 #include <string>
 #include <vector>
 
+#include "core/state.h"
+
 namespace Sound
 {
 
@@ -52,6 +54,9 @@ int get_capture_sample_rate();
 
 void initialize(std::vector<uint8_t>& sound_rom);
 void shutdown();
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int CTRL_START = 0x04080000;
 constexpr static int CTRL_END = 0x040A0000;

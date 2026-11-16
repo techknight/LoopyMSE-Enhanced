@@ -51,6 +51,28 @@ bool enable(uint32_t cart_checksum)
 	return enabled;
 }
 
+void save_state(State::Writer& w)
+{
+	w.put(computed_volume);
+	w.put(op_v);
+	w.put(op_s);
+	w.put(op_a);
+	w.put(vc_vl);
+	w.put(vc_rp);
+	w.put(vc_sm);
+}
+
+void load_state(State::Reader& r)
+{
+	r.get(computed_volume);
+	r.get(op_v);
+	r.get(op_s);
+	r.get(op_a);
+	r.get(vc_vl);
+	r.get(vc_rp);
+	r.get(vc_sm);
+}
+
 void reset_params()
 {
 	computed_volume = 1;

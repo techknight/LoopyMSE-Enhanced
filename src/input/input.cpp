@@ -18,6 +18,40 @@ static bool mouse_plugged;
 //Automation owns the pad and mouse; input from the person is ignored.
 static bool user_blocked = false;
 
+//A press and its release can arrive between two frames (a quick tap, or
+//synthetic key events): the release is held back until a frame has seen the
+//press, so no press is ever lost.
+static int pressed_this_frame = 0;
+static int release_after_frame = 0;
+
+static void user_pad(int button, bool pressed)
+{
+	if (pressed)
+	{
+		release_after_frame &= ~button;
+		pressed_this_frame |= button;
+		LoopyIO::update_pad(button, true);
+	}
+	else if (pressed_this_frame & button)
+	{
+		release_after_frame |= button;
+	}
+	else
+	{
+		LoopyIO::update_pad(button, false);
+	}
+}
+
+void end_of_frame()
+{
+	if (release_after_frame)
+	{
+		LoopyIO::update_pad(release_after_frame, false);
+	}
+	pressed_this_frame = 0;
+	release_after_frame = 0;
+}
+
 void initialize()
 {
 	//Indicate the gamepad (or mouse, when plugged) is connected
@@ -39,7 +73,7 @@ void set_controller_state(int button, bool pressed)
 	}
 
 	PadButton pad_button = binding->second;
-	LoopyIO::update_pad(pad_button, pressed);
+	user_pad(pad_button, pressed);
 }
 
 void set_key_state(int key, bool pressed)
@@ -52,7 +86,7 @@ void set_key_state(int key, bool pressed)
 	}
 
 	PadButton pad_button = binding->second;
-	LoopyIO::update_pad(pad_button, pressed);
+	user_pad(pad_button, pressed);
 }
 
 void set_mouse_button_state(int button, bool pressed)

@@ -1,4 +1,6 @@
+#include <cstring>
 #include <fstream>
+#include <stdexcept>
 #include <string>
 #include "core/cart.h"
 #include "core/memory.h"
@@ -82,6 +84,25 @@ void sram_commit_check()
 void set_sram_write_enabled(bool enabled)
 {
 	sram_write_enabled = enabled;
+}
+
+void save_state(::State::Writer& w)
+{
+	w.section("cart");
+	w.put_vector(state.sram);
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("cart");
+	std::vector<uint8_t> sram;
+	r.get_vector(sram);
+	if (sram.size() != state.sram.size())
+	{
+		throw std::runtime_error("savestate is for a cartridge with a different save size");
+	}
+	//In place: the SRAM buffer is mapped into the CPU's address space
+	memcpy(state.sram.data(), sram.data(), sram.size());
 }
 
 }

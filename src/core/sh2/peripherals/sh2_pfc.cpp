@@ -15,6 +15,18 @@ struct GpioState
 
 static GpioState gpio;
 
+void save_state(State::Writer& w)
+{
+	w.section("pfc");
+	w.put(gpio);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("pfc");
+	r.get(gpio);
+}
+
 uint16_t read_gpio_inputs(int port)
 {
 	if (port == 0)

@@ -6,6 +6,7 @@ add_library (core STATIC
 			 "loopy_io.h"
 			 "memory.cpp"
 			 "memory.h"
+			 "state.h"
 			 "system.cpp"
 			 "system.h"
 			 "timing.cpp"

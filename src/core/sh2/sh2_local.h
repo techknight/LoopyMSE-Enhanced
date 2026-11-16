@@ -37,6 +37,9 @@ struct CPU
 
 	//Address of the instruction being executed (for watches and diagnostics)
 	uint32_t executing_addr;
+
+	//A CPU access to a misaligned address: address error after the instruction
+	bool address_error;
 };
 
 extern CPU sh2;

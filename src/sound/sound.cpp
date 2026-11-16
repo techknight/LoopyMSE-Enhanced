@@ -150,6 +150,30 @@ void set_output_enabled(bool enabled)
 	output_enabled = enabled;
 }
 
+static std::vector<uint8_t>* engine_rom = nullptr;
+
+void save_state(State::Writer& w)
+{
+	w.section("sound");
+	w.put(timeref_ev);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("sound");
+	r.get(timeref_ev);
+	// The synthesizer is not part of a savestate (it never affects the
+	// emulated machine): it restarts silent and picks up from the next notes.
+	if (sound_engine && engine_rom)
+	{
+		if (audio_device) SDL_LockAudioDevice(audio_device);
+		sound_engine = std::make_unique<LoopySound::LoopySound>(*engine_rom, (float)sample_rate, buffer_size);
+		capture_owed = 0;
+		if (audio_device) SDL_UnlockAudioDevice(audio_device);
+	}
+	wav_stop();
+}
+
 void set_capture(CaptureFunc sink)
 {
 	capture_sink = sink;
@@ -164,6 +188,7 @@ void initialize(std::vector<uint8_t>& sound_rom)
 {
 	if (!sound_rom.empty())
 	{
+		engine_rom = &sound_rom;
 		bool have_device = false;
 		if (output_enabled)
 		{

@@ -348,6 +348,7 @@ void register_settings(Registry& r, Args& a)
 	);
 	r.add_string("paths.screenshots", a.screenshot_dir, "Folder for screenshots (overrides paths.output)");
 	r.add_string("paths.prints", a.print_dir, "Folder for printed stickers (overrides paths.output)");
+	r.add_string("paths.states", a.state_dir, "Folder for savestate slots (F5-F8; overrides paths.output)");
 
 	r.add_choice("screenshot.image_type", a.screenshot_image_type, {"png", "bmp", "jpg"}, "Screenshot file type");
 
@@ -358,6 +359,10 @@ void register_settings(Registry& r, Args& a)
 		"Viewer command; $FILE is replaced by the print's path, (OPEN) uses the system viewer"
 	);
 	r.add_bool("printer.correct_aspect_ratio", a.printer_correct_aspect_ratio, "Stretch prints to the sticker's shape");
+	r.add_int(
+		"printer.cassette", a.printer_cassette, 0, 7,
+		"Sticker cassette the program sees: 0 = none, 1 = XS-11 (the type prints are made for), 2-7 = other types"
+	);
 
 	r.add_choice(
 		"debug.log_level", a.log_level, {"verbose", "trace", "debug", "info", "warn", "error"}, "Least important log level shown"
@@ -388,6 +393,7 @@ void register_settings(Registry& r, Args& a)
 	r.add_bool(
 		"automation.start_paused", a.start_paused, "Hold emulation at frame 0 until the control channel says resume or step"
 	);
+	r.add_string("automation.load_state", a.load_state, "Load this savestate before the first frame");
 	r.add_u64("automation.exit_after_frames", a.exit_after_frames, "Quit after this many frames (0 = never)");
 	r.add_u64("automation.shot_every", a.shot_every, "Save a screenshot every N frames (0 = never)");
 	r.add_frame_list("automation.shot_at", a.shot_at, "Save screenshots at these frames (comma-separated)");
@@ -439,6 +445,7 @@ const Alias ALIASES[] = {
 	{"log", "debug.log_file", nullptr, "Write the log to a file"},
 	{"profile", "profile.file", nullptr, "Write a CPU profile to a file"},
 	{"record", "record.video", nullptr, "Record video with sound (needs ffmpeg)"},
+	{"load-state", "automation.load_state", nullptr, "Start from a savestate"},
 };
 
 const Alias* find_alias(const std::string& name)

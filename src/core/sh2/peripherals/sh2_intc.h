@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include "core/state.h"
+
 namespace SH2::OCPM::INTC
 {
 
@@ -50,5 +52,10 @@ void write16(uint32_t addr, uint16_t value);
 
 void assert_irq(IRQ irq, int vector_offs);
 void deassert_irq(IRQ irq);
+// Offer the highest pending request to the CPU again (its mask changed)
+void resend();
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 }

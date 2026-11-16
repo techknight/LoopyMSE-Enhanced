@@ -1,6 +1,7 @@
 #include "expansion.h"
 
 #include <memory>
+#include <stdexcept>
 #include <vector>
 
 #include "expansion/msm665x/msm665x.h"
@@ -26,6 +27,24 @@ void initialize(Config::CartInfo& cart)
 void shutdown()
 {
 	if (MSM665X::is_enabled()) MSM665X::shutdown();
+}
+
+void save_state(State::Writer& w)
+{
+	w.section("expansion");
+	w.put<uint8_t>(MSM665X::is_enabled());
+	if (MSM665X::is_enabled()) MSM665X::save_state(w);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("expansion");
+	bool was_enabled = r.get<uint8_t>() != 0;
+	if (was_enabled != MSM665X::is_enabled())
+	{
+		throw std::runtime_error("savestate is for a different cartridge (expansion audio)");
+	}
+	if (was_enabled) MSM665X::load_state(r);
 }
 
 void unmapped_write8(uint32_t addr, uint8_t value)

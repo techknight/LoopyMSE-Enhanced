@@ -45,4 +45,8 @@ void error(const char* fmt, ...);
 void unimplemented(const char* fmt, ...);
 uint64_t unimplemented_count();
 
+// The program did something that faults on a console (an address error).
+// Reported and counted like unimplemented hardware, for strict runs.
+void fault(const char* fmt, ...);
+
 }  // namespace Log

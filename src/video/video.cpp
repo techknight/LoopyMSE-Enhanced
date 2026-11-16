@@ -14,6 +14,7 @@
 #include <cstring>
 #include <fstream>
 #include <limits>
+#include <stdexcept>
 
 #include "video/render.h"
 #include "video/vdp_local.h"
@@ -78,6 +79,41 @@ void set_raster_warnings(bool enabled)
 int get_vcount()
 {
 	return vdp.vcount;
+}
+
+//Everything in the VDP after its output buffers (VRAM, OAM, palette,
+//registers, counters), the last finished picture, and the pending events.
+//The other buffers are rebuilt during every frame.
+static size_t vdp_plain_offset()
+{
+	return (const char*)&vdp.frame_ended - (const char*)&vdp;
+}
+
+void save_state(State::Writer& w)
+{
+	w.section("vdp");
+	size_t offset = vdp_plain_offset();
+	w.put<uint32_t>((uint32_t)(sizeof(VDP) - offset));
+	w.bytes((const char*)&vdp + offset, sizeof(VDP) - offset);
+	w.bytes(vdp.display_output.get(), sizeof(uint16_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT);
+	w.put(vcount_ev);
+	w.put(hsync_ev);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("vdp");
+	size_t offset = vdp_plain_offset();
+	if (r.get<uint32_t>() != sizeof(VDP) - offset)
+	{
+		throw std::runtime_error("savestate does not match this build (VDP layout)");
+	}
+	r.bytes((char*)&vdp + offset, sizeof(VDP) - offset);
+	r.bytes(vdp.display_output.get(), sizeof(uint16_t) * DISPLAY_WIDTH * DISPLAY_HEIGHT);
+	r.get(vcount_ev);
+	r.get(hsync_ev);
+	//The controller scan mode lives in LoopyIO too; keep them in step
+	LoopyIO::set_controller_scan_mode(vdp.mode.pad_scan, vdp.mode.mouse_scan);
 }
 
 double get_frame_rate()

@@ -48,6 +48,7 @@ struct Args
 	std::string output_dir;
 	std::string screenshot_dir;
 	std::string print_dir;
+	std::string state_dir;
 
 	// [screenshot]
 	std::string screenshot_image_type = "png";
@@ -57,6 +58,7 @@ struct Args
 	bool printer_view = true;
 	std::string printer_view_command = "(OPEN)";
 	bool printer_correct_aspect_ratio = true;
+	int printer_cassette = 1;
 
 	// [debug]
 	std::string log_level = "info";
@@ -75,6 +77,7 @@ struct Args
 	std::string control = "none";  // none | stdin
 	std::string window = "normal";  // normal | minimized | hidden
 	bool start_paused = false;
+	std::string load_state;
 	uint64_t exit_after_frames = 0;
 	uint64_t shot_every = 0;
 	std::vector<uint64_t> shot_at;

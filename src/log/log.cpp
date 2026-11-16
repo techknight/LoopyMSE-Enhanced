@@ -166,33 +166,46 @@ void error(const char* fmt, ...)
 	LOG_AT(ERROR);
 }
 
-void unimplemented(const char* fmt, ...)
+// Every occurrence counts; each distinct message is printed once, with the
+// frame it first happened at, so a register poked in a loop does not flood
+// the log.
+static void report_once(const char* tag, const char* fmt, va_list args)
 {
-	// Every occurrence counts; each distinct message is printed once, with
-	// the frame it first happened at, so a register poked in a loop does not
-	// flood the log.
 	static std::set<std::string> reported;
 	constexpr size_t MAX_REPORTED = 256;
 
 	unimplemented_hits++;
 	char message[512];
-	va_list args;
-	va_start(args, fmt);
 	vsnprintf(message, sizeof message, fmt, args);
-	va_end(args);
-	if (reported.size() >= MAX_REPORTED || !reported.insert(message).second) return;
+	if (reported.size() >= MAX_REPORTED || !reported.insert(std::string(tag) + message).second) return;
 
 	FILE* f = out();
 	if (frame_prefix)
 	{
 		fprintf(f, "[f%llu] ", (unsigned long long)frame);
 	}
-	fprintf(f, "[ERROR] [UNIMPLEMENTED] %s (first at frame %llu)\n", message, (unsigned long long)frame);
+	fprintf(f, "[ERROR] [%s] %s (first at frame %llu)\n", tag, message, (unsigned long long)frame);
 	if (reported.size() == MAX_REPORTED)
 	{
-		fputs("[ERROR] [UNIMPLEMENTED] further distinct reports suppressed\n", f);
+		fputs("[ERROR] further distinct reports suppressed\n", f);
 	}
 	fflush(f);
+}
+
+void unimplemented(const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	report_once("UNIMPLEMENTED", fmt, args);
+	va_end(args);
+}
+
+void fault(const char* fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	report_once("FAULT", fmt, args);
+	va_end(args);
 }
 
 uint64_t unimplemented_count()

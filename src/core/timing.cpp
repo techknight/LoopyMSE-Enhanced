@@ -1,6 +1,8 @@
 #include <algorithm>
 #include <cassert>
+#include <stdexcept>
 #include <vector>
+#include "core/state.h"
 #include "core/timing.h"
 
 namespace Timing
@@ -17,6 +19,7 @@ struct Event
 	int64_t exec_time;
 	uint64_t param;
 	EventFunc func;
+	int func_index;  //into state.funcs, for savestates
 	int64_t id;
 
 	friend bool operator>(const Event& l, const Event& r);
@@ -157,6 +160,7 @@ EventHandle add_event(FuncHandle func, UnitCycle cycles, uint64_t param, int cor
 	RegisteredFunc* reg_func = &state.funcs[func.value];
 	Event ev;
 	ev.func = reg_func->func;
+	ev.func_index = func.value;
 	ev.param = param;
 	ev.id = (timer->next_event_id << 8) | timer->id;
 	timer->next_event_id++;
@@ -236,6 +240,65 @@ int64_t get_timestamp(int id)
 UnitCycle convert_cpu(int64_t cycles)
 {
 	return convert<F_CPU>(cycles);
+}
+
+//Taken between frames: no slice is in progress. Event functions are stored by
+//their registration index (modules register them in a fixed order), and event
+//parameters must be plain values, never pointers.
+void save_state(::State::Writer& w)
+{
+	w.section("timing");
+	w.put<uint32_t>((uint32_t)state.funcs.size());
+	w.put<int32_t>(state.cur_timer ? state.cur_timer->id : -1);
+	for (Timer& timer : state.timers)
+	{
+		w.put(timer.timestamp);
+		w.put(timer.next_event_id);
+		w.put<uint32_t>((uint32_t)timer.events.size());
+		for (const Event& ev : timer.events)
+		{
+			w.put(ev.exec_time);
+			w.put(ev.param);
+			w.put<int32_t>(ev.func_index);
+			w.put(ev.id);
+		}
+	}
+}
+
+void load_state(::State::Reader& r)
+{
+	r.section("timing");
+	if (r.get<uint32_t>() != state.funcs.size())
+	{
+		throw std::runtime_error("savestate does not match this build (timing functions)");
+	}
+	int32_t cur = r.get<int32_t>();
+	state.cur_timer = cur >= 0 ? &state.timers[cur] : nullptr;
+	for (Timer& timer : state.timers)
+	{
+		r.get(timer.timestamp);
+		r.get(timer.next_event_id);
+		timer.slice_length = 0;
+		timer.in_slice = false;
+		timer.set_cycles_left(0);
+		uint32_t count = r.get<uint32_t>();
+		timer.events.clear();
+		for (uint32_t i = 0; i < count; i++)
+		{
+			Event ev;
+			r.get(ev.exec_time);
+			r.get(ev.param);
+			ev.func_index = r.get<int32_t>();
+			r.get(ev.id);
+			if (ev.func_index < 0 || ev.func_index >= (int)state.funcs.size())
+			{
+				throw std::runtime_error("savestate is damaged (event function)");
+			}
+			ev.func = state.funcs[ev.func_index].func;
+			timer.events.push_back(ev);
+		}
+		std::make_heap(timer.events.begin(), timer.events.end(), std::greater<>());
+	}
 }
 
 }

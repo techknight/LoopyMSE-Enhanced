@@ -124,6 +124,30 @@ static int last_load = -1;
 static bool split_on = false;
 static double split[S_NUM];
 
+void save_state(State::Writer& w)
+{
+	w.section("cost");
+	w.put(ROM);
+	w.put(rom_forced);
+	w.put(row);
+	w.put(fast_bm);
+	w.put(pending);
+	w.put(last_load);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("cost");
+	r.get(ROM);
+	r.get(rom_forced);
+	r.get(row);
+	r.get(fast_bm);
+	r.get(pending);
+	r.get(last_load);
+	collect = false;
+	data_sum = 0.0;
+}
+
 void reset()
 {
 	row = -1;

@@ -11,6 +11,7 @@
 
 #include "core/sh2/peripherals/sh2_dmac.h"
 #include "core/sh2/peripherals/sh2_intc.h"
+#include "core/sh2/peripherals/sh2_ocpm.h"
 #include "core/sh2/peripherals/sh2_pfc.h"
 #include "core/sh2/peripherals/sh2_serial.h"
 #include "core/sh2/peripherals/sh2_timers.h"
@@ -286,6 +287,12 @@ void run()
 				cost_owed -= wait;
 				sh2.fetch_cycles = wait;
 			}
+			if (sh2.address_error)
+			{
+				//CPU address error, taken once the faulting instruction is done
+				sh2.address_error = false;
+				raise_exception(9);
+			}
 			//This should probably be done more directly in the interpreter
 			if (was_delay_slot)
 			{
@@ -300,6 +307,10 @@ void run()
 	}
 }
 
+//The interrupt controller's highest request. An accepted request is latched
+//until taken (the VDP's interrupts are pulses). One the mask holds back stays
+//pending at the controller while its source stays up (the ITU and SCI
+//flags), and is offered again when the mask is lowered (set_sr).
 void assert_irq(int vector_id, int prio)
 {
 	if (!can_accept_exception(vector_id, prio))
@@ -334,7 +345,69 @@ void set_pc(uint32_t new_pc)
 
 void set_sr(uint32_t new_sr)
 {
+	uint32_t old_mask = (sh2.sr >> 4) & 0xF;
 	sh2.sr = new_sr & 0x3F3;
+	if (((sh2.sr >> 4) & 0xF) < old_mask)
+	{
+		//A request held back by the old mask may be taken now
+		OCPM::INTC::resend();
+	}
+}
+
+void save_state(State::Writer& w)
+{
+	w.section("sh2");
+	w.put(sh2.gpr);
+	w.put(sh2.pc);
+	w.put(sh2.pr);
+	w.put(sh2.macl);
+	w.put(sh2.mach);
+	w.put(sh2.gbr);
+	w.put(sh2.vbr);
+	w.put(sh2.sr);
+	w.put(sh2.cycles_left);
+	w.put(sh2.pending_exception_prio);
+	w.put(sh2.pending_exception_vector);
+	w.put(sh2.fetch_done);
+	w.put(sh2.fetch_cycles);
+	w.put(sh2.pipeline_src_addr);
+	w.put(sh2.pipeline_instruction);
+	w.put(sh2.pipeline_valid);
+	w.put(sh2.in_delay_slot);
+	w.put(sh2.in_nointerrupt_slot);
+	w.put(sh2.executing_addr);
+	w.put(cost_owed);
+	w.put(cost_addr);
+	Cost::save_state(w);
+	OCPM::save_state(w);
+}
+
+void load_state(State::Reader& r)
+{
+	r.section("sh2");
+	r.get(sh2.gpr);
+	r.get(sh2.pc);
+	r.get(sh2.pr);
+	r.get(sh2.macl);
+	r.get(sh2.mach);
+	r.get(sh2.gbr);
+	r.get(sh2.vbr);
+	r.get(sh2.sr);
+	r.get(sh2.cycles_left);
+	r.get(sh2.pending_exception_prio);
+	r.get(sh2.pending_exception_vector);
+	r.get(sh2.fetch_done);
+	r.get(sh2.fetch_cycles);
+	r.get(sh2.pipeline_src_addr);
+	r.get(sh2.pipeline_instruction);
+	r.get(sh2.pipeline_valid);
+	r.get(sh2.in_delay_slot);
+	r.get(sh2.in_nointerrupt_slot);
+	r.get(sh2.executing_addr);
+	r.get(cost_owed);
+	r.get(cost_addr);
+	Cost::load_state(r);
+	OCPM::load_state(r);
 }
 
 void add_hook(uint32_t address, HookFunc hook)

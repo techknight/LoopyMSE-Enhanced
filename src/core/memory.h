@@ -2,8 +2,13 @@
 #include <cstdint>
 #include <vector>
 
+#include "core/state.h"
+
 namespace Memory
 {
+
+void save_state(State::Writer& w);
+void load_state(State::Reader& r);
 
 constexpr static int BIOS_START = 0x00000000;
 constexpr static int BIOS_SIZE = 0x8000;
