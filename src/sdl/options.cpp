@@ -304,6 +304,10 @@ void register_settings(Registry& r, Args& a)
 	r.add_bool("video.correct_aspect_ratio", a.correct_aspect_ratio, "Stretch display pixels to 4:3");
 	r.add_bool("video.crop_overscan", a.crop_overscan, "Crop border and overscan areas");
 	r.add_bool("video.antialias", a.antialias, "Smooth scaling (recommended with aspect ratio correction)");
+	r.add_bool(
+		"video.raster_artifacts", a.raster_artifacts,
+		"Draw the snow a console shows when palette, OAM or tile VRAM is accessed while a line is drawn"
+	);
 
 	r.add_choice(
 		"input.device", a.device, {"pad", "mouse", "auto"},

@@ -23,7 +23,8 @@ struct MouseState
 	uint16_t buttons;
 	uint16_t counter_x;
 	uint16_t counter_y;
-	uint16_t noise;
+	uint8_t encoder_x;	//Position of each rotary encoder in its 4-step gray-code cycle
+	uint8_t encoder_y;
 };
 
 struct State
@@ -53,18 +54,27 @@ void shutdown()
 	//nop
 }
 
-//Measured on hardware: while a mouse is on the port, the pad matrix bits read
-//constantly-changing garbage. A Galois LFSR stands in for it: deterministic, so
-//runs are reproducible, but hostile enough that software which trusts the pad
-//while a mouse is present misbehaves as it does on the console.
-static uint16_t mouse_pad_noise()
+//The mouse's input pins, as every controller byte reads them (measured with
+//LoopyProbe): bit 7 detect (always 1), bit 6 right button and bit 4 left button
+//(active-low), bits 3-0 the raw encoders YB YA XB XA. Each encoder steps through
+//the gray code 00, 01, 11, 10 (B A) per count in the + direction, so the bits
+//stay still while the mouse does and change with every count of motion; software
+//that reads the pad while a mouse is on the port sees phantom buttons only then.
+static uint8_t mouse_pins()
 {
-	if (state.mouse.noise == 0)
-	{
-		state.mouse.noise = 0xACE1;
-	}
-	state.mouse.noise = (state.mouse.noise >> 1) ^ (-(state.mouse.noise & 1) & 0xB400);
-	return state.mouse.noise;
+	static const uint8_t gray[4] = {0b00, 0b01, 0b11, 0b10};
+	uint8_t pins = 0x80 | gray[state.mouse.encoder_x & 3] | (gray[state.mouse.encoder_y & 3] << 2);
+	if (!(state.mouse.buttons & 0x1000)) pins |= 0x10;
+	if (!(state.mouse.buttons & 0x4000)) pins |= 0x40;
+	return pins;
+}
+
+//The delta counters are signed 12-bit and saturate at +2047 and -2048
+static uint16_t add_saturated(uint16_t counter, int delta)
+{
+	int value = (counter & 0x800) ? (int)(counter & 0xFFF) - 0x1000 : (int)(counter & 0xFFF);
+	value = std::clamp(value + delta, -2048, 2047);
+	return (uint16_t)(value & 0xFFF);
 }
 
 uint8_t reg_read8(uint32_t addr)
@@ -144,11 +154,9 @@ static uint16_t read16_impl(uint32_t addr)
 		}
 		else if (state.mouse.plugged)
 		{
-			//Bit 15 is the mouse presence bit and bits 12-14 mirror the buttons
-			//active-low; games check this pattern to detect the mouse. The pad
-			//matrix bits read garbage while a mouse is connected.
-			uint16_t mb = ((~state.mouse.buttons) & 0x7000) | 0x8000;
-			return mb | (mb >> 8) | (mouse_pad_noise() & 0x0F0F);
+			//Both bytes of all three registers read the mouse's pins; bit 15 is
+			//how games detect it
+			return mouse_pins() * 0x0101;
 		}
 		return 0;
 	case 0x012:
@@ -158,11 +166,11 @@ static uint16_t read16_impl(uint32_t addr)
 		}
 		else if (state.mouse.plugged)
 		{
-			return mouse_pad_noise() & 0x000F;
+			return mouse_pins() * 0x0101;
 		}
 		return 0;
 	case 0x014:
-		return 0;
+		return state.mouse.plugged ? mouse_pins() * 0x0101 : 0;
 	case 0x030:
 		return state.latched_sensors;
 	case 0x050:
@@ -275,14 +283,20 @@ void update_mouse_buttons(int btn_info, bool pressed)
 
 void update_mouse_position(int delta_x, int delta_y)
 {
+	if (!state.mouse.plugged)
+	{
+		return;
+	}
+	//The encoder pins follow the motion whatever the scan mode
+	state.mouse.encoder_x = (uint8_t)((state.mouse.encoder_x + delta_x) & 3);
+	state.mouse.encoder_y = (uint8_t)((state.mouse.encoder_y + delta_y) & 3);
 	//Measured on hardware: the delta counters only accumulate under mouse-only
 	//scan. With the pad scan bit also set the same motion produces no counts,
 	//so software that leaves both scan bits armed sees a frozen cursor.
-	if (state.mouse.plugged && state.scan_mouse && !state.scan_pad)
+	if (state.scan_mouse && !state.scan_pad)
 	{
-		//The hardware counters are 12-bit and wrap
-		state.mouse.counter_x = (state.mouse.counter_x + delta_x) & 0xFFF;
-		state.mouse.counter_y = (state.mouse.counter_y + delta_y) & 0xFFF;
+		state.mouse.counter_x = add_saturated(state.mouse.counter_x, delta_x);
+		state.mouse.counter_y = add_saturated(state.mouse.counter_y, delta_y);
 	}
 }
 
@@ -302,6 +316,8 @@ void set_controller_plugged(bool plugged_pad, bool plugged_mouse)
 		state.mouse.buttons = 0;
 		state.mouse.counter_x = 0;
 		state.mouse.counter_y = 0;
+		state.mouse.encoder_x = 0;
+		state.mouse.encoder_y = 0;
 	}
 }
 

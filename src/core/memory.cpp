@@ -70,6 +70,15 @@ void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size, bool writab
 	}
 }
 
+void unmap_sh2_pagetable(uint32_t start, uint32_t size)
+{
+	for (uint32_t i = start >> 12; i < (start + size) >> 12; i++)
+	{
+		state->sh2_pagetable[i] = nullptr;
+		state->sh2_write_pagetable[i] = nullptr;
+	}
+}
+
 uint8_t** get_sh2_pagetable()
 {
 	return state->sh2_pagetable.data();

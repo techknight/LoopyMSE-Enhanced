@@ -10,10 +10,12 @@ bool enabled = false;
 
 // Measured costs, in cycles, from the console benchmark.
 // Cartridge ROM is a variable for the what-if of fewer wait states (WCR3);
-// the BIOS's setting is two, so three cycles an access.
+// the BIOS's setting is two, so three cycles an access. The BIOS is the
+// SH7021's on-chip ROM: LoopyProbe measured calls into it as fast as calls
+// into on-chip RAM, one cycle a fetch.
 static double ROM = 3.0;
 static bool rom_forced = false;
-constexpr double SRAM = 3.0, BIOS = 3.0;
+constexpr double SRAM = 3.0, BIOS = 1.0;
 
 void set_cart_rom_cycles(double cycles)
 {

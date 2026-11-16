@@ -69,10 +69,12 @@ void start_frame();
 bool check_frame_end();
 int get_display_scanlines();
 int get_vcount();
-// Emulated frames per emulated second (a little over 60)
+// Emulated frames per emulated second (59.73)
 double get_frame_rate();
 // Report palette and OAM writes that land on a line being drawn
 void set_raster_warnings(bool enabled);
+// Draw what palette, OAM and tile VRAM accesses during a line do to it
+void set_raster_artifacts(bool enabled);
 uint16_t get_background_color();
 uint16_t* get_display_output();
 
@@ -97,6 +99,14 @@ uint32_t oam_read32(uint32_t addr);
 void oam_write8(uint32_t addr, uint8_t value);
 void oam_write16(uint32_t addr, uint16_t value);
 void oam_write32(uint32_t addr, uint32_t value);
+
+uint8_t tile_read8(uint32_t addr);
+uint16_t tile_read16(uint32_t addr);
+uint32_t tile_read32(uint32_t addr);
+
+void tile_write8(uint32_t addr, uint8_t value);
+void tile_write16(uint32_t addr, uint16_t value);
+void tile_write32(uint32_t addr, uint32_t value);
 
 uint8_t capture_read8(uint32_t addr);
 uint16_t capture_read16(uint32_t addr);

@@ -9,6 +9,7 @@
 #include <core/timing.h>
 #include <log/log.h>
 
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -27,17 +28,20 @@ static Timing::EventHandle vcount_ev, hsync_ev, irq0_ev;
 
 VDP vdp;
 
-//NTSC raster timing, measured on hardware: the VDP runs at 21.477272 MHz, a
-//line is 1365 VDP cycles and a frame 263 lines (59.826 frames a second). The
+//NTSC raster timing: a line is 1365 VDP cycles and a frame 263 lines. The
 //active part of a line, HCOUNT 0 to 0x101 at 4 VDP cycles a step, takes 1029
 //cycles; then HCOUNT jumps to 0x1AC for the blanking, and VCOUNT counts up.
+//LoopyProbe measured a frame on a console at 267,892.4 CPU cycles, 0.17% more
+//than the nominal clocks (21.477272 MHz VDP, 16 MHz CPU) give. The emulator
+//keeps the CPU at 16 MHz, everything else is timed by it, so frames run at
+//59.73 a second.
 constexpr static int LINES_PER_FRAME = 263;
-constexpr static int64_t VDP_CLOCK = 21477272;
 constexpr static int VDP_CYCLES_PER_LINE = 1365;
 constexpr static int VDP_ACTIVE_CYCLES = 1029;
-//2684659 VDP cycles are exactly 2000000 CPU cycles (16 MHz / 21.477272 MHz)
-constexpr static int64_t VDP_REBASE = 2684659;
-constexpr static int64_t CPU_REBASE = 2000000;
+//Ten frames (3,589,950 VDP cycles) are 2,678,924 CPU cycles
+constexpr static int REBASE_FRAMES = 10;
+constexpr static int64_t VDP_REBASE = (int64_t)VDP_CYCLES_PER_LINE * LINES_PER_FRAME * REBASE_FRAMES;
+constexpr static int64_t CPU_REBASE = 2678924;
 
 static int64_t vdp_to_cpu(int64_t vdp_cycles)
 {
@@ -73,9 +77,105 @@ static uint16_t current_hcount()
 	return (uint16_t)std::min<int64_t>(0x1AC + (v - VDP_ACTIVE_CYCLES) / 4, 0x1FF);
 }
 
-// Palette and OAM writes while a line is being drawn put dots on the picture
-// of a real console; the emulator draws them clean. With raster warnings on,
-// such writes are counted and reported once a frame.
+// Raster artifacts. The VDP fetches the palette, OAM and tile VRAM while it
+// draws a line; a CPU or DMA access to them in that time wins the bus and
+// the VDP's fetch fails. LoopyProbe's captures and photographs of a console
+// (probe/results/hardware) show what each kind of access does:
+// - a palette read: the pixel being drawn shows the colour that was read
+//   (about one pixel an access);
+// - a palette write, to any entry: a white pixel, for about one write in four;
+// - an OAM write: whole rows of sprites go missing;
+// - a tile VRAM read or write: black dashes where a BG layer is drawn, the
+//   transparent parts included, BG tiles that vanish, and holes in sprites.
+// The backdrop never shows them. Which accesses hit is an approximation from
+// the access's VDP cycle: the measured rates, not the real fetch schedule.
+static bool artifacts_on = true;
+static bool tile_trapped = false;
+
+//The VDP cycle in the line being drawn, or -1 outside the active picture
+static int64_t active_cycle()
+{
+	if (vdp.vcount >= vdp.visible_scanlines) return -1;
+	int64_t c = cycle_in_line();
+	return (c >= 0 && c < VDP_ACTIVE_CYCLES) ? c : -1;
+}
+
+static void palette_access(uint32_t addr, bool write)
+{
+	if (!artifacts_on) return;
+	int64_t c = active_cycle();
+	if (c < 0) return;
+	int x = std::min((int)(c >> 2), DISPLAY_WIDTH - 1);
+	if (write)
+	{
+		if (c & 3) return;
+		vdp.artifacts.pal_color[x] = 0x8000 | 0x7FFF;
+	}
+	else
+	{
+		uint16_t color;
+		memcpy(&color, &vdp.palette[addr & 0x1FE], 2);
+		vdp.artifacts.pal_color[x] = 0x8000 | (Common::bswp16(color) & 0x7FFF);
+	}
+	vdp.artifacts.any = 1;
+}
+
+static void oam_access()
+{
+	if (!artifacts_on) return;
+	int64_t c = active_cycle();
+	if (c < 0) return;
+	//The line's sprite fetches spread over the active picture in OAM order;
+	//an access in the first half of a sprite's slot loses that sprite
+	int slot = (int)(c * OBJ_COUNT * 2 / VDP_ACTIVE_CYCLES);
+	if (slot & 1) return;
+	int id = slot >> 1;
+	vdp.artifacts.obj_miss[id >> 5] |= 1u << (id & 31);
+	vdp.artifacts.any = 1;
+}
+
+static void tile_access()
+{
+	int64_t c = active_cycle();
+	if (c < 0) return;
+	//Fitted to the probe: an access loses a BG tile's map fetch (the tile
+	//vanishes) three times in eight, and a pattern fetch (four black pixels,
+	//or four missing from a sprite) once in eight
+	int phase = (int)(c & 7);
+	if (phase >= 3) return;
+	vdp.artifacts.map_miss[std::min((int)(c >> 5), DISPLAY_WIDTH / 8 - 1)] = 1;
+	if (phase == 0)
+	{
+		vdp.artifacts.tile_miss[std::min((int)(c >> 4), DISPLAY_WIDTH / 4 - 1)] = 1;
+	}
+	vdp.artifacts.any = 1;
+}
+
+//Tile VRAM is in the CPU's page table, which no handler sees. While a line's
+//active picture is drawn (and artifacts are on) it is taken out, so accesses
+//go through tile_read/tile_write below.
+static void set_tile_trap(bool trapped)
+{
+	if (trapped == tile_trapped) return;
+	tile_trapped = trapped;
+	if (trapped)
+	{
+		Memory::unmap_sh2_pagetable(TILE_VRAM_START, TILE_VRAM_SIZE);
+	}
+	else
+	{
+		Memory::map_sh2_pagetable(vdp.tile, TILE_VRAM_START, TILE_VRAM_SIZE);
+	}
+}
+
+void set_raster_artifacts(bool enabled)
+{
+	artifacts_on = enabled;
+	set_tile_trap(enabled && active_cycle() >= 0);
+}
+
+// Palette and OAM writes during the active picture, reported once a frame
+// with raster warnings on (whether or not artifacts are drawn).
 static bool raster_warn = false;
 struct RasterReport
 {
@@ -159,11 +259,12 @@ void load_state(State::Reader& r)
 	r.get(irq0_ev);
 	//The controller scan mode lives in LoopyIO too; keep them in step
 	LoopyIO::set_controller_scan_mode(vdp.mode.pad_scan, vdp.mode.mouse_scan);
+	set_tile_trap(artifacts_on && active_cycle() >= 0);
 }
 
 double get_frame_rate()
 {
-	return (double)VDP_CLOCK / (VDP_CYCLES_PER_LINE * LINES_PER_FRAME);
+	return (double)Timing::F_CPU * REBASE_FRAMES / CPU_REBASE;
 }
 
 struct DumpHeader
@@ -316,7 +417,12 @@ static void active_end(uint64_t param, int cycles_late)
 		{
 			irq2_source_done(0);
 		}
+		if (vdp.artifacts.any)
+		{
+			memset(&vdp.artifacts, 0, sizeof(vdp.artifacts));
+		}
 	}
+	set_tile_trap(false);
 
 	vdp.vcount++;
 
@@ -370,6 +476,7 @@ static void line_begin(uint64_t param, int cycles_late)
 
 	vcount_ev = schedule_vdp(vcount_func, vdp.line_start + VDP_ACTIVE_CYCLES);
 	hsync_ev = schedule_vdp(hsync_func, vdp.line_start + VDP_CYCLES_PER_LINE, 1);
+	set_tile_trap(artifacts_on && vdp.vcount < vdp.visible_scanlines);
 
 	if (vdp.cmp_irq_ctrl.irq0_enable && vdp.cmp_irq_ctrl.irq0_enable2)
 	{
@@ -433,6 +540,7 @@ void initialize()
 	//Start the raster at the beginning of line 0
 	vdp.base_cpu = Timing::get_timestamp(Timing::CPU_TIMER);
 	vdp.line_start = 0;
+	tile_trapped = false;
 	line_begin(0, 0);
 }
 
@@ -505,11 +613,13 @@ void dump_for_serial()
 
 uint8_t palette_read8(uint32_t addr)
 {
+	palette_access(addr, false);
 	return vdp.palette[addr & 0x1FF];
 }
 
 uint16_t palette_read16(uint32_t addr)
 {
+	palette_access(addr, false);
 	uint16_t value;
 	memcpy(&value, &vdp.palette[addr & 0x1FE], 2);
 	return Common::bswp16(value);
@@ -517,6 +627,7 @@ uint16_t palette_read16(uint32_t addr)
 
 uint32_t palette_read32(uint32_t addr)
 {
+	palette_access(addr, false);
 	uint32_t value;
 	memcpy(&value, &vdp.palette[addr & 0x1FE], 4);
 	return Common::bswp32(value);
@@ -525,12 +636,14 @@ uint32_t palette_read32(uint32_t addr)
 void palette_write8(uint32_t addr, uint8_t value)
 {
 	note_raster_write(true);
+	palette_access(addr, true);
 	vdp.palette[addr & 0x1FF] = value;
 }
 
 void palette_write16(uint32_t addr, uint16_t value)
 {
 	note_raster_write(true);
+	palette_access(addr, true);
 	value = Common::bswp16(value);
 	memcpy(&vdp.palette[addr & 0x1FE], &value, 2);
 }
@@ -538,6 +651,7 @@ void palette_write16(uint32_t addr, uint16_t value)
 void palette_write32(uint32_t addr, uint32_t value)
 {
 	note_raster_write(true);
+	palette_access(addr, true);
 	value = Common::bswp32(value);
 	memcpy(&vdp.palette[addr & 0x1FE], &value, 4);
 }
@@ -564,12 +678,14 @@ uint32_t oam_read32(uint32_t addr)
 void oam_write8(uint32_t addr, uint8_t value)
 {
 	note_raster_write(false);
+	oam_access();
 	vdp.oam[addr & 0x1FF] = value;
 }
 
 void oam_write16(uint32_t addr, uint16_t value)
 {
 	note_raster_write(false);
+	oam_access();
 	value = Common::bswp16(value);
 	memcpy(&vdp.oam[addr & 0x1FE], &value, 2);
 }
@@ -577,8 +693,52 @@ void oam_write16(uint32_t addr, uint16_t value)
 void oam_write32(uint32_t addr, uint32_t value)
 {
 	note_raster_write(false);
+	oam_access();
 	value = Common::bswp32(value);
 	memcpy(&vdp.oam[addr & 0x1FE], &value, 4);
+}
+
+//Tile VRAM while it is out of the page table (see set_tile_trap)
+uint8_t tile_read8(uint32_t addr)
+{
+	tile_access();
+	return vdp.tile[addr & 0xFFFF];
+}
+
+uint16_t tile_read16(uint32_t addr)
+{
+	tile_access();
+	uint16_t value;
+	memcpy(&value, &vdp.tile[addr & 0xFFFE], 2);
+	return Common::bswp16(value);
+}
+
+uint32_t tile_read32(uint32_t addr)
+{
+	tile_access();
+	uint32_t value;
+	memcpy(&value, &vdp.tile[addr & 0xFFFC], 4);
+	return Common::bswp32(value);
+}
+
+void tile_write8(uint32_t addr, uint8_t value)
+{
+	tile_access();
+	vdp.tile[addr & 0xFFFF] = value;
+}
+
+void tile_write16(uint32_t addr, uint16_t value)
+{
+	tile_access();
+	value = Common::bswp16(value);
+	memcpy(&vdp.tile[addr & 0xFFFE], &value, 2);
+}
+
+void tile_write32(uint32_t addr, uint32_t value)
+{
+	tile_access();
+	value = Common::bswp32(value);
+	memcpy(&vdp.tile[addr & 0xFFFC], &value, 4);
 }
 
 uint8_t capture_read8(uint32_t addr)

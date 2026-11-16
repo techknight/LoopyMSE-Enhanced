@@ -13,7 +13,7 @@ LoopyMSE game.bin --script walkthrough.txt --hidden --fast --out run1
 
 ## Frames
 
-Everything is counted in emulated frames (59.826 a second, the console's
+Everything is counted in emulated frames (59.73 a second, the console's
 own rate) from power-on.
 **Frame F** is the moment F frames have been emulated:
 
@@ -241,6 +241,7 @@ LoopyMSE game.bin --script demo.txt --hidden --fast --record demo.mp4
 | `debug.watch_log=FILE` | Where the watch lines go (default: the log) |
 | `debug.trace_io=true` | Log every pad, mouse and sensor register access |
 | `debug.raster_warnings=true` | Report palette and OAM writes that land on a line being drawn: on a console they show as dots. The emulator's line timing is approximate (DMA, for one, is instant), so treat reports as pointers, not proof |
+| `video.raster_artifacts=false` | Draw the picture clean. By default palette, OAM and tile VRAM accesses during a line's active picture disturb it as on a console (measured with LoopyProbe): palette writes leave white dots, palette reads show the colour read, OAM writes drop sprite rows, tile VRAM accesses leave black dashes, missing BG tiles and holes in sprites. Which accesses hit is an approximation |
 | `debug.log_frames=true` | Prefix every log line with the frame number |
 | `debug.strict=true` (`--strict`) | End with exit code 2 at the first use of hardware the emulator does not implement (each kind is logged once as `[UNIMPLEMENTED]`) |
 

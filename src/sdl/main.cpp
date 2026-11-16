@@ -1116,6 +1116,7 @@ int main(int argc, char** argv)
 	LoopyIO::set_trace(args.trace_io);
 	LoopyIO::set_seal_cassette(args.printer_cassette);
 	Video::set_raster_warnings(args.raster_warnings);
+	Video::set_raster_artifacts(args.raster_artifacts);
 
 	Recorder::Settings rec;
 	if (!args.record_video.empty()) rec.video = output_file(args.record_video).string();
@@ -1168,7 +1169,7 @@ int main(int argc, char** argv)
 	SDL::initialize(args, title_suffix);
 
 	const uint64_t freq = SDL_GetPerformanceFrequency();
-	//Real time is the Loopy's own frame rate (59.83 frames a second)
+	//Real time is the Loopy's own frame rate (59.73 frames a second)
 	const double FRAMERATE = Video::get_frame_rate();
 	const uint64_t ticks_per_display_frame = (uint64_t)(freq / FRAMERATE);
 	constexpr uint64_t MAX_LAG_FRAMES = 5;

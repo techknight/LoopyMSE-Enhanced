@@ -23,6 +23,8 @@ void shutdown();
 
 // Map memory for the CPU; ROM is mapped read-only (stores to it are ignored)
 void map_sh2_pagetable(uint8_t* data, uint32_t start, uint32_t size, bool writable = true);
+//Accesses to unmapped pages go to the MMIO handlers
+void unmap_sh2_pagetable(uint32_t start, uint32_t size);
 uint8_t** get_sh2_pagetable();
 uint8_t** get_sh2_write_pagetable();
 

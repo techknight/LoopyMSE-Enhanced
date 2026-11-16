@@ -19,8 +19,8 @@ its meaning); `LoopyMSE --help` lists the command-line shortcuts.
   byte-identical frames, sound, logs and savestates, at any speed, hidden or
   not. Use `--no-ini --no-sram-write` so neither a local ini file nor a
   leftover save changes the result.
-- **Frame-exact.** Time is counted in emulated frames from power-on (59.826
-  per emulated second, the console's NTSC rate). Wall-clock time means
+- **Frame-exact.** Time is counted in emulated frames from power-on (59.73
+  per emulated second, 267,892 CPU cycles each as measured on a console). Wall-clock time means
   nothing; never sleep and hope.
 - **Every run ends with an exit code** that says how it ended (below).
   Always check it.
@@ -190,6 +190,7 @@ dumps, `save-state`, `cart.sram`) go into `paths.output` when it is set.
 | Every write to an address | `--debug.watch_writes=0x0C059050,0x09000000:16 --debug.watch_log=w.txt` (frame, line, PC, value) |
 | Pad/mouse register accesses | `--debug.trace_io=true` |
 | Palette/OAM writes during display | `--debug.raster_warnings=true` (approximate; hints only) |
+| The picture without raster snow | `--video.raster_artifacts=false` (default true: palette, OAM and tile VRAM accesses during the active picture disturb it, as on a console) |
 | Unimplemented hardware used | grep the log for `[UNIMPLEMENTED]` and `[FAULT]`, or `--strict` |
 | Where CPU time goes | `--profile p.txt --profile.from=A --profile.to=B` (`ADDR cycles` lines); add `--timing.model=console` for console-like costs |
 | Memory contents | `dump ram ram.bin` (work RAM at 0x09000000, 512 KB) |
@@ -214,4 +215,8 @@ dumps, `save-state`, `cart.sram`) go into `paths.output` when it is set.
   synthesizer restarts silent after a load (the program is unaffected).
 - The default timing model is fast and optimistic; judge performance with
   `--timing.model=console`, and judge final timing on hardware.
+- Dots, streaks, dashes or missing sprites in a `shot` can be raster
+  artifacts: the program touched the palette, OAM or tile VRAM while a line
+  was drawn, which disturbs a console's picture too. Check with
+  `--debug.raster_warnings=true`; move those accesses into the blanking.
 - Exit code 0 with "frame limit reached" means the script did not finish.

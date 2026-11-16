@@ -6,9 +6,11 @@ Based on LoopyMSE 0.5.3.
 
 ### Mouse
 - XN-110 mouse emulation, modelled on measurements of a real Loopy and
-  mouse: 12-bit wrapping counters that only count under mouse-only scan,
-  active-low buttons, and pad noise while the mouse is connected. Every
-  commercial mouse game detects it. (LoopyMSE pull request #9.)
+  mouse (LoopyProbe): signed 12-bit counters that saturate and only count
+  under mouse-only scan, active-low buttons, and the mouse's raw pins in
+  every controller byte (detect, buttons and the encoders' gray code, which
+  changes only with motion). Every commercial mouse game detects it.
+  (LoopyMSE pull request #9.)
 - `input.device=auto` plugs the mouse in for the known mouse games.
 - Autodrive: a cooperating homebrew cartridge can steer the mouse.
 
@@ -28,7 +30,8 @@ Based on LoopyMSE 0.5.3.
 - Serial port logs, write watches, an I/O register trace, raster warnings,
   and a strict mode for unimplemented hardware.
 - A CPU profile per program address, and a console timing model built from
-  hardware measurements (`timing.model=console`).
+  hardware measurements (`timing.model=console`); BIOS code runs at on-chip
+  speed in it, as LoopyProbe measured.
 
 ### Settings
 - One namespace for the ini file and the command line: every
@@ -49,8 +52,9 @@ Based on LoopyMSE 0.5.3.
   strict mode) instead of asserting.
 
 ### Hardware documentation (kasami's megadoc, the BIOS disassembly)
-- Raster timing as measured on an NTSC console: a line is 1365 VDP cycles
-  at 21.477272 MHz, a frame 263 lines, 59.826 frames a second (it was
+- Raster timing as measured on an NTSC console: a line is 1365 VDP cycles,
+  a frame 263 lines and 267,892 CPU cycles (LoopyProbe's measurement, 0.17%
+  more than the nominal clocks give), 59.73 frames a second (it was
   60.06). The line is drawn and VCOUNT counts up as the active pixels end,
   so register writes in the blanking land on the next line; HCOUNT reads the
   real counter (0-0x101, then 0x1AC-0x1FF); IRQ0 fires at HCMP (and VCMP).
@@ -73,7 +77,13 @@ Based on LoopyMSE 0.5.3.
 - `probe/`: a homebrew ROM that measures, on a console, the points where
   the documentation and the emulator disagree (frame period, raster
   counters, memory costs, raster artifacts, the mouse), logs them to SRAM
-  and decodes them into a report; the emulator's results are included.
+  and decodes them into a report. The results of a console (with
+  photographs) and of the emulator are included.
+- From the console's results: the frame length (267,892 CPU cycles), BIOS
+  fetches at on-chip speed in the console timing model, the mouse's pins
+  and saturating counters (see Mouse), and raster artifacts: palette, OAM
+  and tile VRAM accesses while a line is drawn disturb the picture as they
+  do on a console (`video.raster_artifacts`, on by default).
 
 ### Fixes
 - The save file is named by the last dot of the ROM's name: a ROM called

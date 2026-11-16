@@ -30,6 +30,7 @@ struct Args
 	bool correct_aspect_ratio = true;
 	bool crop_overscan = true;
 	bool antialias = true;
+	bool raster_artifacts = true;
 
 	// [input]
 	std::string device = "pad";  // pad | mouse | auto

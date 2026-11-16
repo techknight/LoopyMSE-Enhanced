@@ -159,10 +159,22 @@ struct VDP
 	uint16_t dma_mask;
 	uint16_t dma_value;
 
-	//Raster clock, in VDP cycles (21.477272 MHz): when the VDP clock started,
-	//in CPU cycles, and the VDP cycle the current line started at
+	//Raster clock, in VDP cycles: when the VDP clock started, in CPU cycles,
+	//and the VDP cycle the current line started at
 	int64_t base_cpu;
 	int64_t line_start;
+
+	//What CPU and DMA accesses to the palette, OAM and tile VRAM did to the
+	//line being drawn (the raster artifacts, see video.cpp); cleared after it
+	struct LineArtifacts
+	{
+		int any;
+		uint16_t pal_color[DISPLAY_WIDTH];	   //0x8000 | the colour palette pixels show here
+		uint8_t tile_miss[DISPLAY_WIDTH / 4];  //4-pixel groups whose pattern fetch failed
+		uint8_t map_miss[DISPLAY_WIDTH / 8];   //8-pixel BG tiles whose map fetch failed
+		uint32_t obj_miss[OBJ_COUNT / 32];	   //sprites whose OAM entry was not fetched
+	};
+	LineArtifacts artifacts;
 
 	//Registers kept as written so they read back (and read-modify-writes work)
 	uint16_t irq_ctrl_raw;

@@ -27,6 +27,11 @@ static uint16_t read_palette(uint8_t value)
 	return Common::bswp16(color);
 }
 
+//Raster artifacts on the line being drawn (vdp.artifacts, filled by video.cpp):
+//pixels of a BG layer whose tile fetch failed show this colour (0x8000 | c)
+//until a layer above draws over them
+static uint16_t glitch[2][DISPLAY_WIDTH];
+
 static uint16_t read_screen(int index, int x)
 {
 	uint8_t pal_color = vdp.screens[index][x];
@@ -35,6 +40,11 @@ static uint16_t read_screen(int index, int x)
 		return vdp.backdrops[index];
 	}
 
+	if (vdp.artifacts.any)
+	{
+		if (glitch[index][x]) return glitch[index][x] & 0x7FFF;
+		if (vdp.artifacts.pal_color[x]) return vdp.artifacts.pal_color[x] & 0x7FFF;
+	}
 	return read_palette(pal_color);
 }
 
@@ -44,7 +54,13 @@ static void write_screen(int index, int x, uint8_t value)
 	if (x < DISPLAY_WIDTH)
 	{
 		vdp.screens[index][x] = value;
+		glitch[index][x] = 0;
 	}
+}
+
+static inline bool tile_missed(int screen_x)
+{
+	return vdp.artifacts.any && vdp.artifacts.tile_miss[(screen_x & 0xFF) >> 2];
 }
 
 static inline void write_color_raw(std::unique_ptr<uint16_t[]>& buffer, int x, int y, uint16_t value)
@@ -161,6 +177,20 @@ static void draw_bg(int index, int screen_y)
 		int pal_descriptor = (descriptor >> 12) & 0x3;
 		bool x_flip = (descriptor >> 14) & 0x1;
 		bool y_flip = descriptor >> 15;
+
+		if (tile_missed(screen_x))
+		{
+			//The pattern fetch failed: an opaque black pixel, even where the
+			//tile is clear
+			write_screen(screen_index, screen_x, 0xFF);
+			glitch[screen_index][screen_x] = 0x8000;
+			continue;
+		}
+		if (vdp.artifacts.any && vdp.artifacts.map_miss[screen_x >> 3])
+		{
+			//The map fetch failed: the tile is not drawn
+			continue;
+		}
 
 		int tile_x = x & tile_size_mask;
 		if (x_flip)
@@ -423,6 +453,12 @@ static void draw_obj(int index, int screen_y)
 			continue;
 		}
 
+		//An OAM access took this sprite's fetch: it is missing from the line
+		if (vdp.artifacts.any && (vdp.artifacts.obj_miss[id >> 5] >> (id & 31)) & 1)
+		{
+			continue;
+		}
+
 		uint32_t descriptor;
 		memcpy(&descriptor, vdp.oam + (id * 4), 4);
 		descriptor = Common::bswp32(descriptor);
@@ -480,7 +516,7 @@ static void draw_obj(int index, int screen_y)
 
 		for (int screen_x = start_x; screen_x < start_x + obj_width; screen_x++)
 		{
-			if ((screen_x & 0x1FF) >= DISPLAY_WIDTH)
+			if ((screen_x & 0x1FF) >= DISPLAY_WIDTH || tile_missed(screen_x))
 			{
 				continue;
 			}
@@ -737,6 +773,10 @@ void draw_scanline(int y)
 {
 	//Set both screens to the backdrop color
 	memset(vdp.screens, 0, sizeof(vdp.screens));
+	if (vdp.artifacts.any)
+	{
+		memset(glitch, 0, sizeof(glitch));
+	}
 
 	draw_layers(y);
 
