@@ -86,7 +86,10 @@ Based on LoopyMSE 0.5.3.
   do on a console (`video.raster_artifacts`, on by default).
 
 ### Fixes
-- The save file is named by the last dot of the ROM's name: a ROM called
-  `Game (v1.0).bin` used to save to `Game (v1.sav`.
+- The save file keeps the ROM's whole name: a ROM called
+  `Game (v1.0).bin` used to save to `Game (v1.sav`. Only a short suffix
+  that starts with a letter counts as the extension, so a ROM without one
+  (`Game (v1.0)`) also keeps its name; savestate slots are named the same
+  way.
 - The save file is only rewritten when it has changed.
 - An empty value in the ini file no longer discards the whole file.

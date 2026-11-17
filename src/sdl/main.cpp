@@ -409,14 +409,26 @@ fs::path output_file(const std::string& name)
 	return p;
 }
 
+// The ROM's file name without its extension, for the names of its save and
+// savestate files. Only a short suffix that starts with a letter (".bin",
+// ".lpy") is an extension, so a name without one keeps its dots:
+// "Game (v1.0)" stays whole instead of becoming "Game (v1".
+fs::path rom_base_name(const fs::path& rom_path)
+{
+	fs::path name = rom_path.filename();
+	std::string ext = name.extension().string();
+	bool is_ext = ext.size() >= 2 && ext.size() <= 5 && std::isalpha((unsigned char)ext[1]) &&
+				  std::all_of(ext.begin() + 1, ext.end(), [](char c) { return std::isalnum((unsigned char)c); });
+	return is_ext ? name.stem() : name;
+}
+
 fs::path sram_path_for(const fs::path& rom_path)
 {
 	if (!args.sram_path.empty()) return output_file(args.sram_path);
-	fs::path name = rom_path.filename();
-	name.replace_extension(".sav");
+	fs::path name = rom_base_name(rom_path);
+	name += ".sav";
 	if (!output_dir.empty()) return output_dir / name;
-	fs::path p = rom_path;
-	return p.replace_extension(".sav");
+	return rom_path.parent_path() / name;
 }
 
 void set_output_dirs_for(const fs::path& rom_path)
@@ -589,8 +601,8 @@ fs::path state_slot_path(int slot)
 				   : !output_dir.empty()		? output_dir
 				   : rom.has_parent_path()		? fs::absolute(rom).parent_path()
 												: PREFS_PATH;
-	fs::path name = rom.filename();
-	name.replace_extension(".state" + std::to_string(slot));
+	fs::path name = rom_base_name(rom);
+	name += ".state" + std::to_string(slot);
 	return dir / name;
 }
 
